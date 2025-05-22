@@ -1,85 +1,351 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, requestUrl } from 'obsidian';
+import { parseYaml } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+interface CraftCMSSettings {
+	endpoint: string;
+	token: string;
+	sectionHandle: string;
+	authorId: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: CraftCMSSettings = {
+	endpoint: 'https://old.tedium.co/index.php?action=graphql/api',
+	token: '',
+	sectionHandle: 'posts',
+	authorId: '1'
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+interface PostData {
+	title: string;
+	body: string;
+	deck?: string;
+	shortDeck?: string;
+	slug?: string;
+	metaHeadline?: string;
+	metaDescription?: string;
+	tags?: string[];
+	enabled?: boolean;
+	postDate?: string;
+	featuredImage?: string;
+	sidebarAdToggle?: boolean;
+	topBarAdToggle?: boolean;
+	bottomAdToggle?: boolean;
+	optimizeAds?: boolean;
+}
+
+export default class CraftCMSPlugin extends Plugin {
+	settings: CraftCMSSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		// Add ribbon icon for quick upload
+		const ribbonIconEl = this.addRibbonIcon('upload', 'Upload to Craft CMS', (evt: MouseEvent) => {
+			this.uploadCurrentPost();
 		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+		ribbonIconEl.addClass('craft-cms-ribbon-class');
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
+		// Add command to upload current post
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
+			id: 'upload-current-post',
+			name: 'Upload current post to Craft CMS',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
+				this.uploadCurrentPost();
 			}
 		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
+
+		// Add command to upload with dialog
 		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
+			id: 'upload-post-dialog',
+			name: 'Upload post to Craft CMS (with options)',
+			callback: () => {
+				new UploadModal(this.app, this).open();
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// Add settings tab
+		this.addSettingTab(new CraftCMSSettingTab(this.app, this));
 	}
 
-	onunload() {
+	async uploadCurrentPost() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView) {
+			new Notice('No active markdown file found');
+			return;
+		}
 
+		const file = activeView.file;
+		if (!file) {
+			new Notice('No file selected');
+			return;
+		}
+
+		try {
+			await this.uploadPost(file);
+		} catch (error) {
+			console.error('Upload failed:', error);
+			new Notice(`Upload failed: ${error.message}`);
+		}
+	}
+
+	async uploadPost(file: TFile, options?: { asDraft?: boolean }) {
+		if (!this.settings.token) {
+			new Notice('Please configure your Craft CMS token in settings');
+			return;
+		}
+
+		new Notice('Starting upload...');
+
+		// Read file content
+		const content = await this.app.vault.read(file);
+		const { frontmatter, body } = this.parseFrontmatter(content);
+
+		// Extract post data from frontmatter and content
+		const postData: PostData = {
+			title: frontmatter.title || file.basename,
+			body: body,
+			deck: frontmatter.deck,
+			shortDeck: frontmatter.shortDeck || frontmatter.description,
+			slug: frontmatter.slug || this.slugify(frontmatter.title || file.basename),
+			metaHeadline: frontmatter.metaHeadline || frontmatter.title,
+			metaDescription: frontmatter.metaDescription || frontmatter.description,
+			tags: frontmatter.tags || [],
+			enabled: options?.asDraft ? false : (frontmatter.enabled ?? true),
+			postDate: frontmatter.postDate || frontmatter.date || new Date().toISOString(),
+			featuredImage: frontmatter.featuredImage || frontmatter.image,
+			sidebarAdToggle: frontmatter.sidebarAdToggle ?? true,
+			topBarAdToggle: frontmatter.topBarAdToggle ?? true,
+			bottomAdToggle: frontmatter.bottomAdToggle ?? true,
+			optimizeAds: frontmatter.optimizeAds ?? true
+		};
+
+		// Upload any images found in the post
+		const updatedBody = await this.uploadImagesInContent(body, file);
+		postData.body = updatedBody;
+
+		// Upload featured image if it exists
+		if (postData.featuredImage) {
+			postData.featuredImage = await this.uploadImage(postData.featuredImage, file);
+		}
+
+		// Create the post via GraphQL
+		await this.createPost(postData);
+
+		new Notice('✅ Post uploaded successfully!');
+	}
+
+	parseFrontmatter(content: string): { frontmatter: any, body: string } {
+		const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+		const match = content.match(frontmatterRegex);
+
+		if (match) {
+			try {
+				const frontmatter = parseYaml(match[1]) || {};
+				const body = match[2].trim();
+				return { frontmatter, body };
+			} catch (error) {
+				console.error('Error parsing frontmatter:', error);
+			}
+		}
+
+		return { frontmatter: {}, body: content };
+	}
+
+	async uploadImagesInContent(content: string, currentFile: TFile): Promise<string> {
+		// Find all image references in markdown
+		const imageRegex = /!\[(.*?)\]\(([^)]+)\)/g;
+		let updatedContent = content;
+		const matches = [...content.matchAll(imageRegex)];
+
+		for (const match of matches) {
+			const [fullMatch, altText, imagePath] = match;
+			
+			try {
+				const uploadedUrl = await this.uploadImage(imagePath, currentFile);
+				if (uploadedUrl && uploadedUrl !== imagePath) {
+					updatedContent = updatedContent.replace(fullMatch, `![${altText}](${uploadedUrl})`);
+				}
+			} catch (error) {
+				console.warn(`Failed to upload image ${imagePath}:`, error);
+			}
+		}
+
+		return updatedContent;
+	}
+
+	async uploadImage(imagePath: string, currentFile: TFile): Promise<string> {
+		// If it's already a URL, return as-is
+		if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+			return imagePath;
+		}
+
+		// Resolve the image file
+		let imageFile: TFile | null = null;
+		
+		if (imagePath.startsWith('./') || imagePath.startsWith('../')) {
+			// Relative path
+			const resolvedPath = this.app.metadataCache.getFirstLinkpathDest(imagePath, currentFile.path);
+			imageFile = resolvedPath instanceof TFile ? resolvedPath : null;
+		} else {
+			// Direct file reference
+			imageFile = this.app.vault.getAbstractFileByPath(imagePath) as TFile;
+			if (!imageFile) {
+				// Try to find by name
+				const files = this.app.vault.getFiles();
+				imageFile = files.find(f => f.name === imagePath) || null;
+			}
+		}
+
+		if (!imageFile) {
+			console.warn(`Image file not found: ${imagePath}`);
+			return imagePath;
+		}
+
+		// Read image data
+		const imageData = await this.app.vault.readBinary(imageFile);
+		const base64Data = this.arrayBufferToBase64(imageData);
+
+		// Upload via GraphQL mutation
+		const uploadMutation = `
+			mutation UploadAsset($filename: String!, $data: String!) {
+				save_asset(
+					filename: $filename
+					data: $data
+				) {
+					id
+					url
+				}
+			}
+		`;
+
+		try {
+			const response = await requestUrl({
+				url: this.settings.endpoint,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${this.settings.token}`
+				},
+				body: JSON.stringify({
+					query: uploadMutation,
+					variables: {
+						filename: imageFile.name,
+						data: base64Data
+					}
+				})
+			});
+
+			if (response.json.errors) {
+				throw new Error(response.json.errors[0].message);
+			}
+
+			return response.json.data.save_asset.url;
+		} catch (error) {
+			console.error('Image upload failed:', error);
+			return imagePath; // Return original path if upload fails
+		}
+	}
+
+	async createPost(postData: PostData) {
+		const createPostMutation = `
+			mutation CreatePost(
+				$sectionHandle: [String]!
+				$title: String!
+				$body: String!
+				$deck: String
+				$shortDeck: String
+				$slug: String
+				$metaHeadline: String
+				$metaDescription: String
+				$enabled: Boolean
+				$postDate: String
+				$authorId: [String]
+				$tags: [String]
+				$featuredImage: [String]
+				$sidebarAdToggle: Boolean
+				$topBarAdToggle: Boolean
+				$bottomAdToggle: Boolean
+				$optimizeAds: Boolean
+			) {
+				save_posts_Post(
+					sectionId: $sectionHandle
+					title: $title
+					body: $body
+					deck: $deck
+					shortDeck: $shortDeck
+					slug: $slug
+					metaHeadline: $metaHeadline
+					metaDescription: $metaDescription
+					enabled: $enabled
+					postDate: $postDate
+					postAuthor: $authorId
+					tags: $tags
+					image: $featuredImage
+					sidebarAdToggle: $sidebarAdToggle
+					topBarAdToggle: $topBarAdToggle
+					bottomAdToggle: $bottomAdToggle
+					optimizeAds: $optimizeAds
+				) {
+					id
+					title
+					url
+				}
+			}
+		`;
+
+		const response = await requestUrl({
+			url: this.settings.endpoint,
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${this.settings.token}`
+			},
+			body: JSON.stringify({
+				query: createPostMutation,
+				variables: {
+					sectionHandle: [this.settings.sectionHandle],
+					title: postData.title,
+					body: postData.body,
+					deck: postData.deck,
+					shortDeck: postData.shortDeck,
+					slug: postData.slug,
+					metaHeadline: postData.metaHeadline,
+					metaDescription: postData.metaDescription,
+					enabled: postData.enabled,
+					postDate: postData.postDate,
+					authorId: [this.settings.authorId],
+					tags: postData.tags,
+					featuredImage: postData.featuredImage ? [postData.featuredImage] : [],
+					sidebarAdToggle: postData.sidebarAdToggle,
+					topBarAdToggle: postData.topBarAdToggle,
+					bottomAdToggle: postData.bottomAdToggle,
+					optimizeAds: postData.optimizeAds
+				}
+			})
+		});
+
+		if (response.json.errors) {
+			throw new Error(response.json.errors[0].message);
+		}
+
+		return response.json.data.save_posts_Post;
+	}
+
+	arrayBufferToBase64(buffer: ArrayBuffer): string {
+		const bytes = new Uint8Array(buffer);
+		let binary = '';
+		for (let i = 0; i < bytes.byteLength; i++) {
+			binary += String.fromCharCode(bytes[i]);
+		}
+		return btoa(binary);
+	}
+
+	slugify(text: string): string {
+		return text
+			.toLowerCase()
+			.replace(/[^\w\s-]/g, '')
+			.replace(/[\s_-]+/g, '-')
+			.replace(/^-+|-+$/g, '');
 	}
 
 	async loadSettings() {
@@ -91,44 +357,140 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
+class UploadModal extends Modal {
+	plugin: CraftCMSPlugin;
+	asDraft: boolean = false;
+
+	constructor(app: App, plugin: CraftCMSPlugin) {
 		super(app);
+		this.plugin = plugin;
 	}
 
 	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
+		const { contentEl } = this;
+		contentEl.empty();
+
+		contentEl.createEl('h2', { text: 'Upload to Craft CMS' });
+
+		const form = contentEl.createDiv('craft-upload-form');
+
+		// Draft checkbox
+		const draftContainer = form.createDiv('setting-item');
+		draftContainer.createEl('div', { text: 'Upload as draft', cls: 'setting-item-name' });
+		const draftToggle = draftContainer.createEl('input', { type: 'checkbox' });
+		draftToggle.addEventListener('change', () => {
+			this.asDraft = draftToggle.checked;
+		});
+
+		// Buttons
+		const buttonContainer = form.createDiv('modal-button-container');
+		
+		const uploadBtn = buttonContainer.createEl('button', { 
+			text: 'Upload Post', 
+			cls: 'mod-cta' 
+		});
+		
+		uploadBtn.addEventListener('click', async () => {
+			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (!activeView?.file) {
+				new Notice('No active file found');
+				return;
+			}
+
+			this.close();
+			try {
+				await this.plugin.uploadPost(activeView.file, { asDraft: this.asDraft });
+			} catch (error) {
+				new Notice(`Upload failed: ${error.message}`);
+			}
+		});
+
+		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelBtn.addEventListener('click', () => this.close());
 	}
 
 	onClose() {
-		const {contentEl} = this;
+		const { contentEl } = this;
 		contentEl.empty();
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class CraftCMSSettingTab extends PluginSettingTab {
+	plugin: CraftCMSPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: CraftCMSPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		const {containerEl} = this;
-
+		const { containerEl } = this;
 		containerEl.empty();
 
+		containerEl.createEl('h2', { text: 'Craft CMS Settings' });
+
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('GraphQL Endpoint')
+			.setDesc('Your Craft CMS GraphQL API endpoint')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('https://your-site.com/api/graphql')
+				.setValue(this.plugin.settings.endpoint)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.endpoint = value;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('API Token')
+			.setDesc('Your Craft CMS API token for authentication')
+			.addText(text => text
+				.setPlaceholder('Your API token')
+				.setValue(this.plugin.settings.token)
+				.onChange(async (value) => {
+					this.plugin.settings.token = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Section Handle')
+			.setDesc('The handle of the section where posts should be created')
+			.addText(text => text
+				.setPlaceholder('posts')
+				.setValue(this.plugin.settings.sectionHandle)
+				.onChange(async (value) => {
+					this.plugin.settings.sectionHandle = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Author ID')
+			.setDesc('Default author ID for posts')
+			.addText(text => text
+				.setPlaceholder('1')
+				.setValue(this.plugin.settings.authorId)
+				.onChange(async (value) => {
+					this.plugin.settings.authorId = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Add some helpful text
+		containerEl.createEl('h3', { text: 'Front Matter Format' });
+		const frontmatterExample = containerEl.createEl('pre');
+		frontmatterExample.setText(`---
+title: "Your Post Title"
+deck: "Brief description or subtitle"
+shortDeck: "Even shorter description"
+slug: "your-post-slug"
+metaHeadline: "SEO title"
+metaDescription: "SEO description"
+tags: ["tag1", "tag2"]
+enabled: true
+postDate: "2025-01-20"
+featuredImage: "path/to/image.jpg"
+sidebarAdToggle: true
+topBarAdToggle: true
+bottomAdToggle: true
+optimizeAds: true
+---`);
 	}
 }
