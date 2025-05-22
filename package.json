@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-craft-cms-upload",
-	"version": "1.0.0-beta.3",
+	"version": "1.0.0-beta.4",
 	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
