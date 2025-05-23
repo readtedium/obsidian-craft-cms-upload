@@ -6,13 +6,17 @@ interface CraftCMSSettings {
 	token: string;
 	sectionHandle: string;
 	authorId: string;
+	autoSavePostId: boolean;
+	baseUrl: string;
 }
 
 const DEFAULT_SETTINGS: CraftCMSSettings = {
 	endpoint: 'https://old.tedium.co/index.php?action=graphql/api',
 	token: '',
 	sectionHandle: 'posts',
-	authorId: '1'
+	authorId: '1',
+	autoSavePostId: true,
+	baseUrl: 'https://old.tedium.co'
 }
 
 interface PostData {
@@ -37,15 +41,16 @@ export default class CraftCMSPlugin extends Plugin {
 	settings: CraftCMSSettings;
 
 	async onload() {
+		console.log('🚀 Craft CMS Plugin: Starting to load...');
 		await this.loadSettings();
 
-		// Add ribbon icon for quick upload
+		// Add ribbon icon
 		const ribbonIconEl = this.addRibbonIcon('upload', 'Upload to Craft CMS', (evt: MouseEvent) => {
 			this.uploadCurrentPost();
 		});
 		ribbonIconEl.addClass('craft-cms-ribbon-class');
 
-		// Add command to upload current post
+		// Add commands
 		this.addCommand({
 			id: 'upload-current-post',
 			name: 'Upload current post to Craft CMS',
@@ -54,7 +59,6 @@ export default class CraftCMSPlugin extends Plugin {
 			}
 		});
 
-		// Add command to upload with dialog
 		this.addCommand({
 			id: 'upload-post-dialog',
 			name: 'Upload post to Craft CMS (with options)',
@@ -63,11 +67,178 @@ export default class CraftCMSPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: 'upload-post-force-new',
+			name: 'Upload as NEW post (ignore existing ID)',
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				this.uploadCurrentPost({ forceNew: true });
+			}
+		});
+
+		this.addCommand({
+			id: 'open-craft-url',
+			name: 'Open post in Craft CMS',
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				this.openInCraft();
+			}
+		});
+
+		this.addCommand({
+			id: 'test-craft-connection',
+			name: 'Test Craft CMS connection',
+			callback: () => {
+				this.testConnection();
+			}
+		});
+
+		this.addCommand({
+			id: 'test-craft-mutation',
+			name: 'Test Craft CMS mutation capability',
+			callback: () => {
+				this.testMutationCapability();
+			}
+		});
+
 		// Add settings tab
 		this.addSettingTab(new CraftCMSSettingTab(this.app, this));
+		console.log('✅ Craft CMS Plugin: Fully loaded!');
 	}
 
-	async uploadCurrentPost() {
+	async openInCraft() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView?.file) {
+			new Notice('No active file found');
+			return;
+		}
+
+		const content = await this.app.vault.read(activeView.file);
+		const { frontmatter } = this.parseFrontmatter(content);
+
+		if (frontmatter.craftPostId) {
+			// Use the base URL setting
+			const baseUrl = this.settings.baseUrl || this.extractBaseUrl(this.settings.endpoint);
+			// Build edit URL with proper format: /admin/entries/posts/ID-SLUG?site=default
+			const slug = frontmatter.slug || 'post';
+			const editUrl = `${baseUrl}/admin/entries/posts/${frontmatter.craftPostId}-${slug}?site=default`;
+			console.log('🔗 Opening Craft CMS edit URL:', editUrl);
+			window.open(editUrl, '_blank');
+		} else if (frontmatter.craftUrl) {
+			// Open public URL as fallback
+			console.log('🔗 Opening public URL:', frontmatter.craftUrl);
+			window.open(frontmatter.craftUrl, '_blank');
+		} else {
+			new Notice('No Craft CMS URL found in frontmatter');
+		}
+	}
+
+	extractBaseUrl(endpoint: string): string {
+		// Extract base URL from complex GraphQL endpoint
+		// https://old.tedium.co/index.php?action=graphql/api&schemaUid=... → https://old.tedium.co
+		const url = new URL(endpoint);
+		return `${url.protocol}//${url.host}`;
+	}
+
+	async testConnection() {
+		if (!this.settings.token) {
+			new Notice('Please configure your API token first');
+			return;
+		}
+
+		const testQuery = `
+			query TestConnection {
+				entries (section: "posts", limit: 1) {
+					id
+					title
+				}
+			}
+		`;
+
+		try {
+			new Notice('Testing connection...');
+			
+			const response = await requestUrl({
+				url: this.settings.endpoint,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${this.settings.token}`
+				},
+				body: JSON.stringify({
+					query: testQuery
+				})
+			});
+
+			console.log('🧪 Test response:', response.json);
+
+			if (response.status === 200 && response.json.data) {
+				new Notice('✅ Connection successful!');
+			} else {
+				new Notice('❌ Connection failed');
+			}
+
+		} catch (error) {
+			console.error('Connection test error:', error);
+			new Notice(`Connection test failed: ${error.message}`);
+		}
+	}
+
+	async testMutationCapability() {
+		if (!this.settings.token) {
+			new Notice('Please configure your API token first');
+			return;
+		}
+
+		const introspectionQuery = `
+			query IntrospectionQuery {
+				__schema {
+					mutationType {
+						name
+						fields {
+							name
+							description
+						}
+					}
+				}
+			}
+		`;
+
+		try {
+			new Notice('Testing mutation capability...');
+			
+			const response = await requestUrl({
+				url: this.settings.endpoint,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${this.settings.token}`
+				},
+				body: JSON.stringify({
+					query: introspectionQuery
+				})
+			});
+
+			console.log('🧪 Mutation test response:', response.json);
+
+			if (response.status === 200 && response.json.data) {
+				const mutations = response.json.data.__schema?.mutationType?.fields || [];
+				console.log('🔧 Available mutations:', mutations);
+				
+				if (mutations.length > 0) {
+					new Notice(`✅ Found ${mutations.length} mutations available`);
+				} else {
+					new Notice('❌ No mutations available - check schema permissions');
+				}
+			} else {
+				new Notice('❌ Mutation test failed');
+			}
+
+		} catch (error) {
+			console.error('Mutation test error:', error);
+			new Notice(`Mutation test failed: ${error.message}`);
+		}
+	}
+
+	async uploadCurrentPost(options?: { asDraft?: boolean; forceNew?: boolean }) {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!activeView) {
 			new Notice('No active markdown file found');
@@ -81,14 +252,14 @@ export default class CraftCMSPlugin extends Plugin {
 		}
 
 		try {
-			await this.uploadPost(file);
+			await this.uploadPost(file, options);
 		} catch (error) {
 			console.error('Upload failed:', error);
 			new Notice(`Upload failed: ${error.message}`);
 		}
 	}
 
-	async uploadPost(file: TFile, options?: { asDraft?: boolean }) {
+	async uploadPost(file: TFile, options?: { asDraft?: boolean; forceNew?: boolean }) {
 		if (!this.settings.token) {
 			new Notice('Please configure your Craft CMS token in settings');
 			return;
@@ -96,11 +267,11 @@ export default class CraftCMSPlugin extends Plugin {
 
 		new Notice('Starting upload...');
 
-		// Read file content
 		const content = await this.app.vault.read(file);
 		const { frontmatter, body } = this.parseFrontmatter(content);
 
-		// Extract post data from frontmatter and content
+		console.log('📊 Parsed frontmatter:', frontmatter);
+
 		const postData: PostData = {
 			title: frontmatter.title || file.basename,
 			body: body,
@@ -119,179 +290,149 @@ export default class CraftCMSPlugin extends Plugin {
 			optimizeAds: frontmatter.optimizeAds ?? true
 		};
 
-		// Upload any images found in the post
-		const updatedBody = await this.uploadImagesInContent(body, file);
-		postData.body = updatedBody;
+		console.log('📤 Final post data:', postData);
 
-		// Upload featured image if it exists
-		if (postData.featuredImage) {
-			postData.featuredImage = await this.uploadImage(postData.featuredImage, file);
+		const tagIds = await this.handleTags(postData.tags || []);
+		const existingPostId = frontmatter.craftPostId;
+		const shouldUpdate = existingPostId && !options?.forceNew;
+
+		let result;
+		if (shouldUpdate) {
+			console.log('🔄 Updating existing post with ID:', existingPostId);
+			result = await this.updatePost(existingPostId, postData, tagIds);
+		} else {
+			console.log('🚀 Creating new post...');
+			result = await this.createPost(postData, tagIds);
+			
+			if (result?.id && this.settings.autoSavePostId) {
+				await this.saveCraftDataToFrontmatter(file, {
+					craftPostId: result.id,
+					craftUrl: result.url
+				});
+			}
 		}
 
-		// Create the post via GraphQL
-		await this.createPost(postData);
-
+		console.log('✅ Post processed successfully:', result);
 		new Notice('✅ Post uploaded successfully!');
 	}
 
 	parseFrontmatter(content: string): { frontmatter: any, body: string } {
-		const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+		const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
 		const match = content.match(frontmatterRegex);
 
 		if (match) {
 			try {
-				const frontmatter = parseYaml(match[1]) || {};
-				const body = match[2].trim();
-				return { frontmatter, body };
+				const yamlContent = match[1].trim();
+				const frontmatter = parseYaml(yamlContent) || {};
+				return { frontmatter, body: match[2].trim() };
 			} catch (error) {
-				console.error('Error parsing frontmatter:', error);
+				console.error('❌ Error parsing frontmatter:', error);
+				return { frontmatter: {}, body: match[2].trim() };
 			}
 		}
 
 		return { frontmatter: {}, body: content };
 	}
 
-	async uploadImagesInContent(content: string, currentFile: TFile): Promise<string> {
-		// Find all image references in markdown
-		const imageRegex = /!\[(.*?)\]\(([^)]+)\)/g;
-		let updatedContent = content;
-		const matches = [...content.matchAll(imageRegex)];
+	async handleTags(tagNames: string[]): Promise<number[]> {
+		if (!tagNames || tagNames.length === 0) {
+			return [];
+		}
 
-		for (const match of matches) {
-			const [fullMatch, altText, imagePath] = match;
-			
+		const tagIds: number[] = [];
+
+		for (const tagName of tagNames) {
 			try {
-				const uploadedUrl = await this.uploadImage(imagePath, currentFile);
-				if (uploadedUrl && uploadedUrl !== imagePath) {
-					updatedContent = updatedContent.replace(fullMatch, `![${altText}](${uploadedUrl})`);
+				const findTagQuery = `
+					query FindTag($titles: [String]) {
+						tags(title: $titles, limit: 1) {
+							id
+							title
+						}
+					}
+				`;
+
+				const findResponse = await requestUrl({
+					url: this.settings.endpoint,
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${this.settings.token}`
+					},
+					body: JSON.stringify({
+						query: findTagQuery,
+						variables: { titles: [tagName] }
+					})
+				});
+
+				if (findResponse.json.data?.tags?.length > 0) {
+					const existingTag = findResponse.json.data.tags[0];
+					tagIds.push(parseInt(existingTag.id));
+					console.log(`✅ Found existing tag: ${tagName} (ID: ${existingTag.id})`);
+				} else {
+					console.log(`⏭️ Tag not found: ${tagName}`);
 				}
 			} catch (error) {
-				console.warn(`Failed to upload image ${imagePath}:`, error);
+				console.warn(`❌ Error processing tag ${tagName}:`, error);
 			}
 		}
 
-		return updatedContent;
+		return tagIds;
 	}
 
-	async uploadImage(imagePath: string, currentFile: TFile): Promise<string> {
-		// If it's already a URL, return as-is
-		if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-			return imagePath;
-		}
-
-		// Resolve the image file
-		let imageFile: TFile | null = null;
-		
-		if (imagePath.startsWith('./') || imagePath.startsWith('../')) {
-			// Relative path
-			const resolvedPath = this.app.metadataCache.getFirstLinkpathDest(imagePath, currentFile.path);
-			imageFile = resolvedPath instanceof TFile ? resolvedPath : null;
-		} else {
-			// Direct file reference
-			imageFile = this.app.vault.getAbstractFileByPath(imagePath) as TFile;
-			if (!imageFile) {
-				// Try to find by name
-				const files = this.app.vault.getFiles();
-				imageFile = files.find(f => f.name === imagePath) || null;
-			}
-		}
-
-		if (!imageFile) {
-			console.warn(`Image file not found: ${imagePath}`);
-			return imagePath;
-		}
-
-		// Read image data
-		const imageData = await this.app.vault.readBinary(imageFile);
-		const base64Data = this.arrayBufferToBase64(imageData);
-
-		// Upload via GraphQL mutation
-		const uploadMutation = `
-			mutation UploadAsset($filename: String!, $data: String!) {
-				save_asset(
-					filename: $filename
-					data: $data
-				) {
-					id
-					url
-				}
-			}
-		`;
-
-		try {
-			const response = await requestUrl({
-				url: this.settings.endpoint,
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${this.settings.token}`
-				},
-				body: JSON.stringify({
-					query: uploadMutation,
-					variables: {
-						filename: imageFile.name,
-						data: base64Data
-					}
-				})
-			});
-
-			if (response.json.errors) {
-				throw new Error(response.json.errors[0].message);
-			}
-
-			return response.json.data.save_asset.url;
-		} catch (error) {
-			console.error('Image upload failed:', error);
-			return imagePath; // Return original path if upload fails
-		}
-	}
-
-	async createPost(postData: PostData) {
+	async createPost(postData: PostData, tagIds: number[] = []) {
 		const createPostMutation = `
 			mutation CreatePost(
-				$sectionHandle: [String]!
 				$title: String!
 				$body: String!
+				$enabled: Boolean
 				$deck: String
 				$shortDeck: String
 				$slug: String
+				$postDate: DateTime
 				$metaHeadline: String
 				$metaDescription: String
-				$enabled: Boolean
-				$postDate: String
-				$authorId: [String]
-				$tags: [String]
-				$featuredImage: [String]
-				$sidebarAdToggle: Boolean
-				$topBarAdToggle: Boolean
-				$bottomAdToggle: Boolean
-				$optimizeAds: Boolean
+				$tags: [Int]
 			) {
-				save_posts_Post(
-					sectionId: $sectionHandle
+				save_posts_posts_Entry(
 					title: $title
 					body: $body
+					enabled: $enabled
 					deck: $deck
 					shortDeck: $shortDeck
 					slug: $slug
+					postDate: $postDate
 					metaHeadline: $metaHeadline
 					metaDescription: $metaDescription
-					enabled: $enabled
-					postDate: $postDate
-					postAuthor: $authorId
 					tags: $tags
-					image: $featuredImage
-					sidebarAdToggle: $sidebarAdToggle
-					topBarAdToggle: $topBarAdToggle
-					bottomAdToggle: $bottomAdToggle
-					optimizeAds: $optimizeAds
 				) {
 					id
 					title
 					url
+					slug
+					deck
+					shortDeck
+					postDate
+					tags {
+						id
+						title
+					}
 				}
 			}
 		`;
+
+		const variables = {
+			title: postData.title,
+			body: postData.body,
+			enabled: postData.enabled,
+			deck: postData.deck,
+			shortDeck: postData.shortDeck,
+			slug: postData.slug,
+			postDate: postData.postDate,
+			metaHeadline: postData.metaHeadline,
+			metaDescription: postData.metaDescription,
+			tags: tagIds.length > 0 ? tagIds : undefined
+		};
 
 		const response = await requestUrl({
 			url: this.settings.endpoint,
@@ -302,42 +443,121 @@ export default class CraftCMSPlugin extends Plugin {
 			},
 			body: JSON.stringify({
 				query: createPostMutation,
-				variables: {
-					sectionHandle: [this.settings.sectionHandle],
-					title: postData.title,
-					body: postData.body,
-					deck: postData.deck,
-					shortDeck: postData.shortDeck,
-					slug: postData.slug,
-					metaHeadline: postData.metaHeadline,
-					metaDescription: postData.metaDescription,
-					enabled: postData.enabled,
-					postDate: postData.postDate,
-					authorId: [this.settings.authorId],
-					tags: postData.tags,
-					featuredImage: postData.featuredImage ? [postData.featuredImage] : [],
-					sidebarAdToggle: postData.sidebarAdToggle,
-					topBarAdToggle: postData.topBarAdToggle,
-					bottomAdToggle: postData.bottomAdToggle,
-					optimizeAds: postData.optimizeAds
-				}
+				variables: variables
 			})
 		});
 
-		if (response.json.errors) {
-			throw new Error(response.json.errors[0].message);
+		if (response.json && response.json.errors) {
+			throw new Error(`GraphQL Error: ${JSON.stringify(response.json.errors)}`);
 		}
 
-		return response.json.data.save_posts_Post;
+		if (response.json && response.json.data && response.json.data.save_posts_posts_Entry) {
+			return response.json.data.save_posts_posts_Entry;
+		}
+
+		throw new Error(`Unexpected response format: ${JSON.stringify(response.json)}`);
 	}
 
-	arrayBufferToBase64(buffer: ArrayBuffer): string {
-		const bytes = new Uint8Array(buffer);
-		let binary = '';
-		for (let i = 0; i < bytes.byteLength; i++) {
-			binary += String.fromCharCode(bytes[i]);
+	async updatePost(postId: string, postData: PostData, tagIds: number[] = []) {
+		const updatePostMutation = `
+			mutation UpdatePost(
+				$id: ID!
+				$title: String!
+				$body: String!
+				$enabled: Boolean
+				$deck: String
+				$shortDeck: String
+				$slug: String
+				$postDate: DateTime
+				$metaHeadline: String
+				$metaDescription: String
+				$tags: [Int]
+			) {
+				save_posts_posts_Entry(
+					id: $id
+					title: $title
+					body: $body
+					enabled: $enabled
+					deck: $deck
+					shortDeck: $shortDeck
+					slug: $slug
+					postDate: $postDate
+					metaHeadline: $metaHeadline
+					metaDescription: $metaDescription
+					tags: $tags
+				) {
+					id
+					title
+					url
+					slug
+					deck
+					shortDeck
+					postDate
+					tags {
+						id
+						title
+					}
+				}
+			}
+		`;
+
+		const variables = {
+			id: postId,
+			title: postData.title,
+			body: postData.body,
+			enabled: postData.enabled,
+			deck: postData.deck,
+			shortDeck: postData.shortDeck,
+			slug: postData.slug,
+			postDate: postData.postDate,
+			metaHeadline: postData.metaHeadline,
+			metaDescription: postData.metaDescription,
+			tags: tagIds.length > 0 ? tagIds : undefined
+		};
+
+		const response = await requestUrl({
+			url: this.settings.endpoint,
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${this.settings.token}`
+			},
+			body: JSON.stringify({
+				query: updatePostMutation,
+				variables: variables
+			})
+		});
+
+		if (response.json && response.json.errors) {
+			throw new Error(`GraphQL Error: ${JSON.stringify(response.json.errors)}`);
 		}
-		return btoa(binary);
+
+		if (response.json && response.json.data && response.json.data.save_posts_posts_Entry) {
+			return response.json.data.save_posts_posts_Entry;
+		}
+
+		throw new Error(`Unexpected response format: ${JSON.stringify(response.json)}`);
+	}
+
+	async saveCraftDataToFrontmatter(file: TFile, craftData: { craftPostId: string; craftUrl: string }) {
+		const content = await this.app.vault.read(file);
+		const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
+		const match = content.match(frontmatterRegex);
+
+		if (match) {
+			let yamlContent = match[1];
+			const bodyContent = match[2];
+
+			if (!yamlContent.includes('craftPostId:')) {
+				yamlContent += `\ncraftPostId: ${craftData.craftPostId}`;
+			}
+			if (!yamlContent.includes('craftUrl:')) {
+				yamlContent += `\ncraftUrl: "${craftData.craftUrl}"`;
+			}
+
+			const newContent = `---\n${yamlContent}\n---\n${bodyContent}`;
+			await this.app.vault.modify(file, newContent);
+		}
 	}
 
 	slugify(text: string): string {
@@ -374,7 +594,6 @@ class UploadModal extends Modal {
 
 		const form = contentEl.createDiv('craft-upload-form');
 
-		// Draft checkbox
 		const draftContainer = form.createDiv('setting-item');
 		draftContainer.createEl('div', { text: 'Upload as draft', cls: 'setting-item-name' });
 		const draftToggle = draftContainer.createEl('input', { type: 'checkbox' });
@@ -382,7 +601,6 @@ class UploadModal extends Modal {
 			this.asDraft = draftToggle.checked;
 		});
 
-		// Buttons
 		const buttonContainer = form.createDiv('modal-button-container');
 		
 		const uploadBtn = buttonContainer.createEl('button', { 
@@ -433,10 +651,21 @@ class CraftCMSSettingTab extends PluginSettingTab {
 			.setName('GraphQL Endpoint')
 			.setDesc('Your Craft CMS GraphQL API endpoint')
 			.addText(text => text
-				.setPlaceholder('https://your-site.com/api/graphql')
+				.setPlaceholder('https://your-site.com/index.php?action=graphql/api')
 				.setValue(this.plugin.settings.endpoint)
 				.onChange(async (value) => {
 					this.plugin.settings.endpoint = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Base URL')
+			.setDesc('Your Craft CMS base URL (for admin links)')
+			.addText(text => text
+				.setPlaceholder('https://your-site.com')
+				.setValue(this.plugin.settings.baseUrl)
+				.onChange(async (value) => {
+					this.plugin.settings.baseUrl = value;
 					await this.plugin.saveSettings();
 				}));
 
@@ -473,24 +702,14 @@ class CraftCMSSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		// Add some helpful text
-		containerEl.createEl('h3', { text: 'Front Matter Format' });
-		const frontmatterExample = containerEl.createEl('pre');
-		frontmatterExample.setText(`---
-title: "Your Post Title"
-deck: "Brief description or subtitle"
-shortDeck: "Even shorter description"
-slug: "your-post-slug"
-metaHeadline: "SEO title"
-metaDescription: "SEO description"
-tags: ["tag1", "tag2"]
-enabled: true
-postDate: "2025-01-20"
-featuredImage: "path/to/image.jpg"
-sidebarAdToggle: true
-topBarAdToggle: true
-bottomAdToggle: true
-optimizeAds: true
----`);
+		new Setting(containerEl)
+			.setName('Auto-save Post ID')
+			.setDesc('Automatically save Craft CMS post ID to frontmatter after upload')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoSavePostId)
+				.onChange(async (value) => {
+					this.plugin.settings.autoSavePostId = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 }
