@@ -90,26 +90,10 @@ export default class CraftCMSPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: 'debug-asset-schema',
-			name: 'Debug asset upload schema',
-			callback: () => {
-				this.debugAssetSchema();
-			}
-		});
-
-		this.addCommand({
 			id: 'test-craft-connection',
 			name: 'Test Craft CMS connection',
 			callback: () => {
 				this.testConnection();
-			}
-		});
-
-		this.addCommand({
-			id: 'test-craft-mutation',
-			name: 'Test Craft CMS mutation capability',
-			callback: () => {
-				this.testMutationCapability();
 			}
 		});
 
@@ -146,77 +130,23 @@ export default class CraftCMSPlugin extends Plugin {
 		return `${url.protocol}//${url.host}`;
 	}
 
-	async debugAssetSchema() {
-		if (!this.settings.token) {
-			new Notice('Please configure your API token first');
-			return;
-		}
-
-		// Check what arguments the save_images_Asset mutation actually accepts
-		const introspectionQuery = `
-			query AssetMutationInfo {
-				__schema {
-					mutationType {
-						fields {
-							name
-							args {
-								name
-								type {
-									name
-									kind
-								}
-							}
-						}
-					}
-				}
-			}
-		`;
-
-		try {
-			const response = await requestUrl({
-				url: this.settings.endpoint,
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${this.settings.token}`
-				},
-				body: JSON.stringify({
-					query: introspectionQuery
-				})
-			});
-
-			const mutations = response.json.data.__schema.mutationType.fields;
-			const assetMutation = mutations.find((field: any) => field.name === 'save_images_Asset');
-			
-			if (assetMutation) {
-				console.log('🔍 Asset mutation details:', assetMutation);
-				new Notice('Check console for asset mutation schema details');
-			} else {
-				console.log('❌ save_images_Asset mutation not found');
-				console.log('🔍 Available mutations:', mutations.map((m: any) => m.name).filter((name: string) => name.includes('Asset') || name.includes('asset')));
-				new Notice('Asset mutation not found - check console for alternatives');
-			}
-
-		} catch (error) {
-			console.error('Schema debugging failed:', error);
-			new Notice(`Schema debug failed: ${error.message}`);
-		}
-	}
-
 	async uploadImageToCraft(imageData: ArrayBuffer, filename: string): Promise<{ id: string, url: string }> {
 		console.log('🖼️ Uploading image to Craft CMS:', filename);
-
+		
 		const base64Data = this.arrayBufferToBase64(imageData);
+		const mimeType = this.getMimeType(filename);
+		const dataURL = `data:${mimeType};base64,${base64Data}`;
 
 		const uploadMutation = `
-			mutation UploadAsset($filename: String!, $data: String!) {
+			mutation UploadImage($file: FileInput!, $title: String) {
 				save_images_Asset(
-					filename: $filename
-					tempFilePath: $data
+					_file: $file
+					title: $title
 				) {
 					id
 					url
 					filename
+					title
 				}
 			}
 		`;
@@ -232,20 +162,23 @@ export default class CraftCMSPlugin extends Plugin {
 				body: JSON.stringify({
 					query: uploadMutation,
 					variables: {
-						filename: filename,
-						data: base64Data
+						file: {
+							fileData: dataURL, // Data URL format - this is what works!
+							filename: filename
+						},
+						title: filename.replace(/\.[^/.]+$/, "")
 					}
 				})
 			});
 
-			console.log('📡 Image upload response:', response.json);
+			console.log('📡 Upload response:', response.json);
 
-			if (response.json && response.json.errors) {
+			if (response.json?.errors) {
 				console.error('💥 GraphQL errors:', response.json.errors);
-				throw new Error(`GraphQL Error: ${JSON.stringify(response.json.errors)}`);
+				throw new Error(`Upload failed: ${response.json.errors.map((e: any) => e.message).join(', ')}`);
 			}
 
-			if (response.json && response.json.data && response.json.data.save_images_Asset) {
+			if (response.json?.data?.save_images_Asset) {
 				const asset = response.json.data.save_images_Asset;
 				console.log('✅ Image uploaded successfully:', asset);
 				return { id: asset.id, url: asset.url };
@@ -254,7 +187,7 @@ export default class CraftCMSPlugin extends Plugin {
 			throw new Error(`Unexpected response format: ${JSON.stringify(response.json)}`);
 
 		} catch (error) {
-			console.error('💥 Image upload failed:', error);
+			console.error('🔄 Image upload failed:', error);
 			throw error;
 		}
 	}
@@ -266,6 +199,19 @@ export default class CraftCMSPlugin extends Plugin {
 			binary += String.fromCharCode(bytes[i]);
 		}
 		return btoa(binary);
+	}
+
+	getMimeType(filename: string): string {
+		const ext = filename.toLowerCase().split('.').pop();
+		const mimeTypes: { [key: string]: string } = {
+			'jpg': 'image/jpeg',
+			'jpeg': 'image/jpeg',
+			'png': 'image/png',
+			'gif': 'image/gif',
+			'webp': 'image/webp',
+			'svg': 'image/svg+xml'
+		};
+		return mimeTypes[ext || ''] || 'image/jpeg';
 	}
 
 	async testConnection() {
@@ -309,62 +255,6 @@ export default class CraftCMSPlugin extends Plugin {
 		} catch (error) {
 			console.error('Connection test error:', error);
 			new Notice(`Connection test failed: ${error.message}`);
-		}
-	}
-
-	async testMutationCapability() {
-		if (!this.settings.token) {
-			new Notice('Please configure your API token first');
-			return;
-		}
-
-		const introspectionQuery = `
-			query IntrospectionQuery {
-				__schema {
-					mutationType {
-						name
-						fields {
-							name
-							description
-						}
-					}
-				}
-			}
-		`;
-
-		try {
-			new Notice('Testing mutation capability...');
-			
-			const response = await requestUrl({
-				url: this.settings.endpoint,
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${this.settings.token}`
-				},
-				body: JSON.stringify({
-					query: introspectionQuery
-				})
-			});
-
-			console.log('🧪 Mutation test response:', response.json);
-
-			if (response.status === 200 && response.json.data) {
-				const mutations = response.json.data.__schema?.mutationType?.fields || [];
-				console.log('🔧 Available mutations:', mutations);
-				
-				if (mutations.length > 0) {
-					new Notice(`✅ Found ${mutations.length} mutations available`);
-				} else {
-					new Notice('❌ No mutations available - check schema permissions');
-				}
-			} else {
-				new Notice('❌ Mutation test failed');
-			}
-
-		} catch (error) {
-			console.error('Mutation test error:', error);
-			new Notice(`Mutation test failed: ${error.message}`);
 		}
 	}
 
@@ -763,6 +653,8 @@ class UploadModal extends Modal {
 	}
 }
 
+// Replace your ImageUploadModal class with this styled version:
+
 class ImageUploadModal extends Modal {
 	plugin: CraftCMSPlugin;
 	editor: Editor;
@@ -780,34 +672,404 @@ class ImageUploadModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-
-		contentEl.createEl('h2', { text: 'Upload Image to Craft CMS' });
-
-		const form = contentEl.createDiv('image-upload-form');
-
-		// File upload section
-		const fileSection = form.createDiv('upload-section');
-		fileSection.createEl('h3', { text: 'Select Image' });
-
-		// Local file upload
-		const fileContainer = fileSection.createDiv('file-container');
-		fileContainer.createEl('label', { text: 'Choose local file:' });
-		const fileInput = fileContainer.createEl('input', { type: 'file', attr: { accept: 'image/*' } });
 		
-		// URL input
-		const urlContainer = fileSection.createDiv('url-container');
-		urlContainer.createEl('label', { text: 'Or enter image URL:' });
-		const urlInput = urlContainer.createEl('input', { type: 'url', placeholder: 'https://example.com/image.jpg' });
+		// Add custom CSS styles
+		this.addCustomStyles();
+
+		// Header with icon
+		const header = contentEl.createDiv('craft-upload-header');
+		header.innerHTML = `
+			<div class="craft-header-content">
+				<svg class="craft-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+					<circle cx="8.5" cy="8.5" r="1.5"/>
+					<polyline points="21,15 16,10 5,21"/>
+				</svg>
+				<h2>Upload Image to Craft CMS</h2>
+			</div>
+		`;
+
+		const form = contentEl.createDiv('craft-upload-form');
+
+		// File upload section with drag & drop styling
+		const fileSection = form.createDiv('craft-upload-section');
+		const fileHeader = fileSection.createDiv('craft-section-header');
+		fileHeader.innerHTML = `
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+				<polyline points="7,10 12,15 17,10"/>
+				<line x1="12" y1="15" x2="12" y2="3"/>
+			</svg>
+			<span>Select Image</span>
+		`;
+
+		// Drag & drop area
+		const dropZone = fileSection.createDiv('craft-drop-zone');
+		dropZone.innerHTML = `
+			<div class="craft-drop-content">
+				<svg class="craft-drop-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+					<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+					<circle cx="8.5" cy="8.5" r="1.5"/>
+					<polyline points="21,15 16,10 5,21"/>
+				</svg>
+				<div class="craft-drop-text">
+					<p class="primary">Drop image here or click to browse</p>
+					<p class="secondary">PNG, JPG, GIF, WebP up to 10MB</p>
+				</div>
+			</div>
+		`;
 		
-		// Filename input
-		const nameSection = form.createDiv('name-section');
-		nameSection.createEl('h3', { text: 'File Name' });
+		const fileInput = dropZone.createEl('input', { 
+			type: 'file', 
+			attr: { accept: 'image/*' },
+			cls: 'craft-file-input'
+		});
+
+		// URL input section
+		const urlSection = form.createDiv('craft-upload-section');
+		const urlHeader = urlSection.createDiv('craft-section-header');
+		urlHeader.innerHTML = `
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+				<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+			</svg>
+			<span>Or use URL</span>
+		`;
+		
+		const urlInput = urlSection.createEl('input', { 
+			type: 'url', 
+			placeholder: 'https://example.com/image.jpg',
+			cls: 'craft-url-input'
+		});
+
+		// Filename section
+		const nameSection = form.createDiv('craft-upload-section');
+		const nameHeader = nameSection.createDiv('craft-section-header');
+		nameHeader.innerHTML = `
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+				<polyline points="14,2 14,8 20,8"/>
+				<line x1="16" y1="13" x2="8" y2="13"/>
+				<line x1="16" y1="17" x2="8" y2="17"/>
+				<polyline points="10,9 9,9 8,9"/>
+			</svg>
+			<span>File Name</span>
+		`;
+		
 		const filenameInput = nameSection.createEl('input', { 
 			type: 'text', 
-			placeholder: 'image.jpg',
-			value: this.filename
+			placeholder: 'my-awesome-image.jpg',
+			value: this.filename,
+			cls: 'craft-filename-input'
+		});
+
+		// Preview section
+		const previewSection = form.createDiv('craft-upload-section');
+		const previewHeader = previewSection.createDiv('craft-section-header');
+		previewHeader.innerHTML = `
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+				<circle cx="12" cy="12" r="3"/>
+			</svg>
+			<span>Preview</span>
+		`;
+		
+		this.previewContainer = previewSection.createDiv('craft-preview-container');
+		this.previewContainer.createDiv('craft-preview-placeholder').innerHTML = `
+			<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+				<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+				<circle cx="8.5" cy="8.5" r="1.5"/>
+				<polyline points="21,15 16,10 5,21"/>
+			</svg>
+			<p>No image selected</p>
+		`;
+
+		// Button section
+		const buttonContainer = form.createDiv('craft-button-container');
+		
+		const uploadBtn = buttonContainer.createEl('button', { 
+			text: '🚀 Upload & Get Asset Code', 
+			cls: 'craft-upload-btn'
 		});
 		
+		const cancelBtn = buttonContainer.createEl('button', { 
+			text: 'Cancel',
+			cls: 'craft-cancel-btn'
+		});
+
+		// Event listeners with enhanced UX
+		this.setupEventListeners(fileInput, urlInput, filenameInput, dropZone, uploadBtn, cancelBtn);
+		
+		this.updatePreview();
+	}
+
+	addCustomStyles() {
+		const style = document.createElement('style');
+		style.textContent = `
+			/* Header */
+			.craft-upload-header {
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				margin: -20px -20px 20px -20px;
+				padding: 20px;
+				border-radius: 8px 8px 0 0;
+			}
+			
+			.craft-header-content {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				color: white;
+			}
+			
+			.craft-icon {
+				flex-shrink: 0;
+			}
+			
+			.craft-upload-header h2 {
+				margin: 0;
+				font-size: 1.25rem;
+				font-weight: 600;
+			}
+
+			/* Form */
+			.craft-upload-form {
+				display: flex;
+				flex-direction: column;
+				gap: 24px;
+			}
+
+			/* Sections */
+			.craft-upload-section {
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+			}
+
+			.craft-section-header {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				font-weight: 500;
+				color: var(--text-muted);
+				font-size: 0.9rem;
+			}
+
+			/* Drop Zone */
+			.craft-drop-zone {
+				position: relative;
+				border: 2px dashed var(--background-modifier-border);
+				border-radius: 8px;
+				padding: 32px 16px;
+				text-align: center;
+				transition: all 0.2s ease;
+				cursor: pointer;
+			}
+
+			.craft-drop-zone:hover {
+				border-color: #667eea;
+				background: var(--background-modifier-hover);
+			}
+
+			.craft-drop-zone.drag-over {
+				border-color: #667eea;
+				background: var(--background-modifier-hover);
+				transform: scale(1.02);
+			}
+
+			.craft-drop-content {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 16px;
+			}
+
+			.craft-drop-icon {
+				color: var(--text-muted);
+			}
+
+			.craft-drop-text .primary {
+				font-weight: 500;
+				margin: 0 0 4px 0;
+			}
+
+			.craft-drop-text .secondary {
+				font-size: 0.85rem;
+				color: var(--text-muted);
+				margin: 0;
+			}
+
+			.craft-file-input {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				opacity: 0;
+				cursor: pointer;
+			}
+
+			/* Inputs */
+			.craft-url-input,
+			.craft-filename-input {
+				padding: 12px 16px;
+				border: 1px solid var(--background-modifier-border);
+				border-radius: 6px;
+				font-size: 0.9rem;
+				transition: border-color 0.2s ease;
+			}
+
+			.craft-url-input:focus,
+			.craft-filename-input:focus {
+				outline: none;
+				border-color: #667eea;
+				box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+			}
+
+			/* Preview */
+			.craft-preview-container {
+				border: 1px solid var(--background-modifier-border);
+				border-radius: 8px;
+				min-height: 120px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				overflow: hidden;
+			}
+
+			.craft-preview-placeholder {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 12px;
+				color: var(--text-muted);
+			}
+
+			.craft-preview-placeholder p {
+				margin: 0;
+				font-size: 0.9rem;
+			}
+
+			.craft-preview-container img {
+				max-width: 100%;
+				max-height: 200px;
+				border-radius: 6px;
+			}
+
+			/* Buttons */
+			.craft-button-container {
+				display: flex;
+				gap: 12px;
+				justify-content: flex-end;
+				padding-top: 8px;
+			}
+
+			.craft-upload-btn {
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				color: white;
+				border: none;
+				padding: 12px 24px;
+				border-radius: 6px;
+				font-weight: 500;
+				cursor: pointer;
+				transition: all 0.2s ease;
+			}
+
+			.craft-upload-btn:hover {
+				transform: translateY(-1px);
+				box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+			}
+
+			.craft-upload-btn:disabled {
+				opacity: 0.6;
+				cursor: not-allowed;
+				transform: none;
+			}
+
+			.craft-cancel-btn {
+				background: transparent;
+				color: var(--text-muted);
+				border: 1px solid var(--background-modifier-border);
+				padding: 12px 24px;
+				border-radius: 6px;
+				cursor: pointer;
+				transition: all 0.2s ease;
+			}
+
+			.craft-cancel-btn:hover {
+				background: var(--background-modifier-hover);
+				border-color: var(--text-muted);
+			}
+		`;
+		document.head.appendChild(style);
+	}
+
+	extractFilenameFromUrl(url: string): string {
+		try {
+			// Try to get filename from URL path
+			const urlObj = new URL(url);
+			let filename = urlObj.pathname.split('/').pop() || '';
+			
+			// Remove query parameters if they exist
+			filename = filename.split('?')[0];
+			
+			// If we got a weird filename or no filename, generate a clean one
+			if (!filename || filename.length < 3 || filename.includes('@') || 
+				filename.startsWith('bafkrei') || filename.length > 50) {
+				
+				// Use domain + timestamp for a clean filename
+				const domain = urlObj.hostname.replace(/^www\./, '');
+				const timestamp = Date.now().toString(36); // Base36 for shorter string
+				filename = `${domain}-${timestamp}.jpg`;
+			}
+			
+			// Ensure it has a proper extension
+			if (!filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+				// Try to determine extension from URL or default to jpg
+				if (url.toLowerCase().includes('png')) {
+					filename += '.png';
+				} else if (url.toLowerCase().includes('gif')) {
+					filename += '.gif';
+				} else if (url.toLowerCase().includes('webp')) {
+					filename += '.webp';
+				} else {
+					filename += '.jpg';
+				}
+			}
+			
+			// Clean up the filename
+			filename = filename
+				.replace(/[^a-zA-Z0-9.-]/g, '-') // Replace special chars with dashes
+				.replace(/-+/g, '-') // Collapse multiple dashes
+				.replace(/^-|-$/g, ''); // Remove leading/trailing dashes
+			
+			console.log('🏷️ Generated filename from URL:', filename);
+			return filename;
+			
+		} catch (error) {
+			console.warn('Could not parse URL, using default filename');
+			return `image-${Date.now()}.jpg`;
+		}
+	}
+
+	sanitizeFilename(filename: string): string {
+	if (!filename) return '';
+	
+	// Remove or replace problematic characters
+	return filename
+		.replace(/[<>:"/\\|?*@]/g, '-') // Replace problematic chars
+		.replace(/^\.+/, '') // Remove leading dots
+		.replace(/\.+$/, '') // Remove trailing dots  
+		.replace(/-+/g, '-') // Collapse multiple dashes
+		.replace(/^-|-$/g, '') // Remove leading/trailing dashes
+		.substring(0, 100); // Limit length
+	}
+
+
+	setupEventListeners(fileInput: HTMLInputElement, urlInput: HTMLInputElement, 
+					   filenameInput: HTMLInputElement, dropZone: HTMLElement,
+					   uploadBtn: HTMLButtonElement, cancelBtn: HTMLButtonElement) {
+		
+		// File input
 		fileInput.addEventListener('change', (e) => {
 			const target = e.target as HTMLInputElement;
 			if (target.files && target.files[0]) {
@@ -819,49 +1081,58 @@ class ImageUploadModal extends Modal {
 				this.updatePreview();
 			}
 		});
-		
-		urlInput.addEventListener('input', () => {
-			this.imageUrl = urlInput.value;
-			if (this.imageUrl) {
-				this.selectedFile = null;
-				fileInput.value = '';
-				const urlParts = this.imageUrl.split('/');
-				const urlFilename = urlParts[urlParts.length - 1].split('?')[0];
-				this.filename = urlFilename || 'image.jpg';
+
+		// Drag & drop
+		dropZone.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			dropZone.addClass('drag-over');
+		});
+
+		dropZone.addEventListener('dragleave', () => {
+			dropZone.removeClass('drag-over');
+		});
+
+		dropZone.addEventListener('drop', (e) => {
+			e.preventDefault();
+			dropZone.removeClass('drag-over');
+			
+			const files = e.dataTransfer?.files;
+			if (files && files[0] && files[0].type.startsWith('image/')) {
+				this.selectedFile = files[0];
+				this.filename = files[0].name;
+				this.imageUrl = '';
+				urlInput.value = '';
 				filenameInput.value = this.filename;
 				this.updatePreview();
 			}
 		});
 		
+		// URL input
+		urlInput.addEventListener('input', () => {
+			this.imageUrl = urlInput.value;
+			if (this.imageUrl) {
+				this.selectedFile = null;
+				fileInput.value = '';
+				
+				// Better filename extraction from URL
+				let urlFilename = this.extractFilenameFromUrl(this.imageUrl);
+				this.filename = urlFilename;
+				filenameInput.value = this.filename;
+				this.updatePreview();
+			}
+		});
+		
+		// Filename input
 		filenameInput.addEventListener('input', () => {
 			this.filename = filenameInput.value;
 		});
 
-		// Preview section
-		const previewSection = form.createDiv('preview-section');
-		previewSection.createEl('h3', { text: 'Preview' });
-		this.previewContainer = previewSection.createDiv('preview-container');
-		this.previewContainer.style.border = '1px solid var(--background-modifier-border)';
-		this.previewContainer.style.padding = '10px';
-		this.previewContainer.style.minHeight = '100px';
-		this.previewContainer.style.textAlign = 'center';
-
 		// Buttons
-		const buttonContainer = form.createDiv('modal-button-container');
-		
-		const uploadBtn = buttonContainer.createEl('button', { 
-			text: 'Upload & Get Asset Code', 
-			cls: 'mod-cta' 
-		});
-		
 		uploadBtn.addEventListener('click', async () => {
 			await this.handleUpload();
 		});
 
-		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
 		cancelBtn.addEventListener('click', () => this.close());
-
-		this.updatePreview();
 	}
 
 	updatePreview() {
@@ -874,25 +1145,38 @@ class ImageUploadModal extends Modal {
 			reader.onload = (e) => {
 				const img = this.previewContainer.createEl('img');
 				img.src = e.target?.result as string;
-				img.style.maxWidth = '200px';
-				img.style.maxHeight = '200px';
 			};
 			reader.readAsDataURL(this.selectedFile);
 		} else if (this.imageUrl) {
 			const img = this.previewContainer.createEl('img');
 			img.src = this.imageUrl;
-			img.style.maxWidth = '200px';
-			img.style.maxHeight = '200px';
 			img.onerror = () => {
 				this.previewContainer.empty();
-				this.previewContainer.createEl('div', { text: '❌ Could not load image from URL' });
+				this.previewContainer.createDiv('craft-preview-placeholder').innerHTML = `
+					<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+						<circle cx="12" cy="12" r="10"/>
+						<line x1="15" y1="9" x2="9" y2="15"/>
+						<line x1="9" y1="9" x2="15" y2="15"/>
+					</svg>
+					<p>Could not load image from URL</p>
+				`;
 			};
 		} else {
-			this.previewContainer.createEl('div', { text: 'No image selected' });
+			this.previewContainer.createDiv('craft-preview-placeholder').innerHTML = `
+				<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+					<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+					<circle cx="8.5" cy="8.5" r="1.5"/>
+					<polyline points="21,15 16,10 5,21"/>
+				</svg>
+				<p>No image selected</p>
+			`;
 		}
 	}
 
 	async handleUpload() {
+		// Clean up the filename before validation
+		this.filename = this.sanitizeFilename(this.filename);
+		
 		if (!this.filename) {
 			new Notice('Please enter a filename');
 			return;
@@ -909,15 +1193,53 @@ class ImageUploadModal extends Modal {
 			let imageData: ArrayBuffer;
 
 			if (this.selectedFile) {
+				// Local file upload
 				imageData = await this.selectedFile.arrayBuffer();
+				console.log('📁 Using local file:', this.selectedFile.name, this.selectedFile.size, 'bytes');
 			} else {
-				const response = await requestUrl({
-					url: this.imageUrl,
-					method: 'GET'
-				});
-				imageData = response.arrayBuffer;
+				// URL download with better error handling
+				console.log('🌐 Downloading from URL:', this.imageUrl);
+				
+				try {
+					const response = await requestUrl({
+						url: this.imageUrl,
+						method: 'GET',
+						headers: {
+							'User-Agent': 'Mozilla/5.0 (compatible; ObsidianBot/1.0)'
+						}
+					});
+
+					console.log('📡 URL response status:', response.status);
+					console.log('📡 URL response headers:', response.headers);
+					
+					if (response.status !== 200) {
+						throw new Error(`Failed to download image: HTTP ${response.status}`);
+					}
+
+					// Check if we got actual image data
+					const contentType = response.headers['content-type'] || response.headers['Content-Type'];
+					console.log('📄 Content type:', contentType);
+					
+					if (contentType && !contentType.startsWith('image/')) {
+						throw new Error(`URL returned ${contentType}, expected image content`);
+					}
+
+					imageData = response.arrayBuffer;
+					console.log('✅ Downloaded image data:', imageData.byteLength, 'bytes');
+
+					if (imageData.byteLength === 0) {
+						throw new Error('Downloaded image has no content');
+					}
+
+				} catch (urlError) {
+					console.error('💥 URL download failed:', urlError);
+					new Notice(`Failed to download image from URL: ${urlError.message}`);
+					return;
+				}
 			}
 
+			// Proceed with upload
+			console.log('🚀 Starting Craft CMS upload...');
 			const result = await this.plugin.uploadImageToCraft(imageData, this.filename);
 			const assetCode = `{asset:${result.id}:img}`;
 			this.editor.replaceSelection(assetCode);
