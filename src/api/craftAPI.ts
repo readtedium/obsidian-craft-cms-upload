@@ -320,7 +320,7 @@ export class CraftAPI {
 			}
 		`;
 
-		const response = await this.makeRequest(query);
+		const response = await this.makeRequest<{ __schema: any }>(query);
 		return response.data?.__schema;
 	}
 }
