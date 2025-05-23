@@ -5,19 +5,23 @@ import { DEFAULT_SETTINGS, validateSettings, extractBaseUrl } from './src/settin
 import { CraftCMSSettingTab } from './src/settings/settingsTab';
 import { UploadModal } from './src/ui/uploadModal';
 import { ImageUploadModal } from './src/ui/imageModal';
+import { SchemaAnalysisModal } from './src/ui/schemaModal';
+import { SchemaManager } from './src/api/schemaManager';
 import { parseFrontmatter, addToFrontmatter } from './src/utils/frontmatter';
 import { slugify } from './src/utils/textUtils';
 
 export default class CraftCMSPlugin extends Plugin {
 	settings: CraftCMSSettings;
 	api: CraftAPI;
+	schemaManager: SchemaManager;
 
 	async onload() {
 		console.log('🚀 Craft CMS Plugin: Starting to load...');
 		await this.loadSettings();
 		
-		// Initialize API client
+		// Initialize API client and schema manager
 		this.api = new CraftAPI(this.settings);
+		this.schemaManager = new SchemaManager(this.api);
 
 		// Register ribbon icon
 		const ribbonIconEl = this.addRibbonIcon('upload', 'Upload to Craft CMS', (evt: MouseEvent) => {
@@ -80,6 +84,22 @@ export default class CraftCMSPlugin extends Plugin {
 			name: 'Test Craft CMS connection',
 			callback: () => {
 				this.testConnection();
+			}
+		});
+
+		this.addCommand({
+			id: 'analyze-craft-schema',
+			name: 'Analyze Craft CMS Schema',
+			callback: () => {
+				new SchemaAnalysisModal(this.app, this).open();
+			}
+		});
+
+		this.addCommand({
+			id: 'smart-upload-with-schema',
+			name: 'Smart Upload (Schema-based)',
+			callback: () => {
+				this.smartUpload();
 			}
 		});
 	}
@@ -221,16 +241,71 @@ export default class CraftCMSPlugin extends Plugin {
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 		
-		// Update API client when settings change
+		// Update API client and schema manager when settings change
 		if (this.api) {
 			this.api = new CraftAPI(this.settings);
+			this.schemaManager = new SchemaManager(this.api);
 		}
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 		
-		// Update API client with new settings
+		// Update API client and schema manager with new settings
 		this.api = new CraftAPI(this.settings);
+		this.schemaManager = new SchemaManager(this.api);
+	}
+
+	/**
+	 * Smart upload that uses schema analysis to determine optimal upload strategy
+	 */
+	private async smartUpload() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView?.file) {
+			new Notice('No active file found');
+			return;
+		}
+
+		try {
+			new Notice('🧠 Analyzing content for smart upload...');
+
+			// Get available content types for the current section
+			const contentTypes = await this.schemaManager.getContentTypesForSection(this.settings.sectionHandle);
+			
+			if (contentTypes.length === 0) {
+				new Notice('No content types found for this section. Using standard upload.');
+				await this.uploadCurrentPost();
+				return;
+			}
+
+			// For now, use the first content type. In the future, this could be smarter
+			const contentType = contentTypes[0];
+			
+			// Validate the content type supports our upload
+			const validation = await this.schemaManager.validateContentTypeForUpload(contentType.handle);
+			
+			if (!validation.valid) {
+				new Notice(`Content type validation failed: ${validation.errors.join(', ')}`);
+				return;
+			}
+
+			if (validation.warnings && validation.warnings.length > 0) {
+				console.warn('⚠️ Upload warnings:', validation.warnings);
+			}
+
+			// Get form fields for this content type
+			const formFields = await this.schemaManager.getFormFields(contentType.handle);
+			console.log('📋 Available fields for smart upload:', formFields);
+
+			new Notice(`✅ Smart upload ready! Using ${contentType.name} with ${formFields.length} fields`);
+			
+			// For now, fall back to regular upload. Future enhancement: dynamic form
+			await this.uploadCurrentPost();
+
+		} catch (error) {
+			console.error('💥 Smart upload failed:', error);
+			new Notice(`Smart upload failed: ${error.message}. Using standard upload.`);
+			await this.uploadCurrentPost();
+		}
 	}
 }

@@ -192,6 +192,17 @@ export class CraftCMSSettingTab extends PluginSettingTab {
 			}
 		});
 
+		const schemaBtn = buttonContainer.createEl('button', {
+			text: '🔍 Analyze Schema',
+			cls: 'mod-secondary'
+		});
+
+		schemaBtn.addEventListener('click', () => {
+			import('../ui/schemaModal').then(({ SchemaAnalysisModal }) => {
+				new SchemaAnalysisModal(this.app, this.plugin).open();
+			});
+		});
+
 		// Add some CSS for better styling
 		this.addSettingsCSS();
 	}
@@ -239,6 +250,8 @@ export class CraftCMSSettingTab extends PluginSettingTab {
 					margin-top: 2rem;
 					padding-top: 1rem;
 					border-top: 1px solid var(--background-modifier-border);
+					display: flex;
+					gap: 12px;
 				}
 
 				.craft-button-container button:disabled {
