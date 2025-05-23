@@ -1,7 +1,7 @@
 import { requestUrl } from 'obsidian';
 import { CraftAPI } from '../api/craftAPI';
 import { FileUpload } from '../api/types';
-import { getMimeType, arrayBufferToBase64, extractFilenameFromUrl } from './textUtils';
+import { getMimeType, arrayBufferToBase64, extractFilenameFromUrl } from '../utils/textUtils';
 
 export class ImageManager {
 	constructor(private api: CraftAPI) {}

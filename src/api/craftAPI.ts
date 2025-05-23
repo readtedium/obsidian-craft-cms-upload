@@ -48,9 +48,6 @@ export class CraftAPI {
 		}
 	}
 
-    async findAuthors(): Promise<Author[]> { /* ... */ }
-    async findCategories(): Promise<Category[]> { /* ... */ }
-
 	async findTags(tagNames: string[]): Promise<number[]> {
 		if (!tagNames || tagNames.length === 0) {
 			return [];

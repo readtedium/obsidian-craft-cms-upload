@@ -1,5 +1,5 @@
 import { App, Editor, Modal, Notice } from 'obsidian';
-import CraftCMSPlugin from '../main';
+import CraftCMSPlugin from '../../main';
 import { ImageManager } from '../content/imageManager';
 import { sanitizeFilename, extractFilenameFromUrl } from '../utils/textUtils';
 

@@ -1,4 +1,7 @@
-// content/batchProcessor.ts
+import { TFile } from 'obsidian';
+
+// Placeholder for future batch processing feature
 export class BatchProcessor {
-  async uploadMultiplePosts(files: TFile[]): Promise<void> { /* ... */ }
+  // TODO: Implement batch upload functionality
+  // async uploadMultiplePosts(files: TFile[]): Promise<void> { /* ... */ }
 }
