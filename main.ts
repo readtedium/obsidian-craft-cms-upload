@@ -4,6 +4,8 @@ import { CraftCMSSettings, PostData, UploadOptions } from './src/api/types';
 import { DEFAULT_SETTINGS, validateSettings, extractBaseUrl } from './src/settings/settings';
 import { CraftCMSSettingTab } from './src/settings/settingsTab';
 import { UploadModal } from './src/ui/uploadModal';
+import { DynamicUploadModal } from './src/ui/dynamicUploadModal';
+import { TabbedUploadModal } from './src/ui/tabbedUploadModal';
 import { ImageUploadModal } from './src/ui/imageModal';
 import { SchemaAnalysisModal } from './src/ui/schemaModal';
 import { SchemaManager } from './src/api/schemaManager';
@@ -100,6 +102,22 @@ export default class CraftCMSPlugin extends Plugin {
 			name: 'Smart Upload (Schema-based)',
 			callback: () => {
 				this.smartUpload();
+			}
+		});
+
+		this.addCommand({
+			id: 'dynamic-upload',
+			name: 'Dynamic Upload (Smart Form)',
+			callback: () => {
+				new DynamicUploadModal(this.app, this).open();
+			}
+		});
+
+		this.addCommand({
+			id: 'tabbed-upload',
+			name: 'Tabbed Upload (Smart Form)',
+			callback: () => {
+				new TabbedUploadModal(this.app, this).open();
 			}
 		});
 	}
