@@ -1,4 +1,4 @@
-import { App, MarkdownView, Modal, Notice, TFile } from 'obsidian';
+import { App, MarkdownView, Modal, Notice, TFile, requestUrl } from 'obsidian';
 import CraftCMSPlugin from '../../main';
 import { CraftContentType, FormFieldDefinition } from '../api/schemaIntrospector';
 import { PostData } from '../api/types';
@@ -14,6 +14,7 @@ export class TabbedUploadModal extends Modal {
 	private currentFile: TFile | null = null;
 	private asDraft: boolean = false;
 	private activeTab: string = 'article';
+	private dropdownOptions: Record<string, Array<{value: string, label: string}>> = {};
 
 	// Tab configuration matching Craft CMS style
 	private tabs: Record<string, { name: string; icon: string; fields: string[] }> = {
@@ -35,7 +36,7 @@ export class TabbedUploadModal extends Modal {
 		taxonomy: {
 			name: 'Taxonomy',
 			icon: '🏷️',
-			fields: ['tags', 'category', 'postAuthor']
+			fields: ['tags', 'category', 'postAuthor', 'categories'] // Added categories as well
 		},
 		media: {
 			name: 'Media',
@@ -45,7 +46,7 @@ export class TabbedUploadModal extends Modal {
 		advanced: {
 			name: 'Advanced',
 			icon: '⚙️',
-			fields: [] as string[] // Explicitly typed as string array
+			fields: [] as string[]
 		}
 	};
 
@@ -69,6 +70,7 @@ export class TabbedUploadModal extends Modal {
 
 		this.addModalStyles();
 		await this.loadContentTypes();
+		await this.loadDropdownOptions(); // Load dropdown data BEFORE prefilling
 		await this.prefillFromFrontmatter();
 		this.organizeFieldsByTabs();
 		this.render();
@@ -118,6 +120,187 @@ export class TabbedUploadModal extends Modal {
 		}
 	}
 
+	private async loadDropdownOptions() {
+		try {
+			console.log('🔍 Loading dropdown options...');
+			
+			// Initialize the dropdown options object
+			this.dropdownOptions = {};
+			
+			// Load authors and categories in parallel
+			await Promise.all([
+				this.loadAuthors(),
+				this.loadCategories()
+			]);
+			
+			console.log('📋 Loaded dropdown options:', this.dropdownOptions);
+		} catch (error) {
+			console.error('⚠️ Failed to load dropdown options:', error);
+			// Continue anyway - dropdowns will just be empty
+		}
+	}
+
+	private async loadAuthors() {
+		try {
+			const authorsQuery = `
+				query GetAuthors {
+					entries(section: "author", limit: 50) {
+						id
+						title
+						... on author_author_Entry {
+							firstName
+							lastName
+						}
+					}
+				}
+			`;
+
+			const response = await requestUrl({
+				url: this.plugin.settings.endpoint,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${this.plugin.settings.token}`
+				},
+				body: JSON.stringify({
+					query: authorsQuery
+				})
+			});
+			
+			if (response.json?.data?.entries) {
+				const authors = response.json.data.entries.map((author: any) => {
+					// Try to use firstName + lastName if available, otherwise fall back to title
+					const displayName = author.firstName && author.lastName 
+						? `${author.firstName} ${author.lastName}` 
+						: author.title;
+					
+					return {
+						value: author.id,
+						label: displayName
+					};
+				});
+
+				// Set up author dropdown options for multiple possible field names
+				this.dropdownOptions.postAuthor = authors;
+				this.dropdownOptions.author = authors; // Some schemas might use 'author' instead
+				this.dropdownOptions.authorId = authors; // Or 'authorId'
+				
+				console.log(`✅ Loaded ${authors.length} authors`);
+			} else {
+				console.log('ℹ️ No authors found or unexpected response structure');
+				this.dropdownOptions.postAuthor = [];
+				this.dropdownOptions.author = [];
+				this.dropdownOptions.authorId = [];
+			}
+		} catch (error) {
+			console.error('❌ Failed to load authors:', error);
+			this.dropdownOptions.postAuthor = [];
+			this.dropdownOptions.author = [];
+			this.dropdownOptions.authorId = [];
+		}
+	}
+
+	private async loadCategories() {
+		try {
+			const categoriesQuery = `
+				query GetCategories {
+					categories(limit: 50) {
+						id
+						title
+						slug
+					}
+				}
+			`;
+
+			const response = await requestUrl({
+				url: this.plugin.settings.endpoint,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${this.plugin.settings.token}`
+				},
+				body: JSON.stringify({
+					query: categoriesQuery
+				})
+			});
+			
+			if (response.json?.data?.categories) {
+				const categories = response.json.data.categories.map((category: any) => ({
+					value: category.id,
+					label: category.title
+				}));
+
+				// Set up category dropdown options for multiple possible field names
+				this.dropdownOptions.category = categories;
+				this.dropdownOptions.categories = categories; // Some schemas might use plural
+				this.dropdownOptions.categoryId = categories; // Or with Id suffix
+				
+				console.log(`✅ Loaded ${categories.length} categories`);
+			} else {
+				console.log('ℹ️ No categories found or unexpected response structure');
+				this.dropdownOptions.category = [];
+				this.dropdownOptions.categories = [];
+				this.dropdownOptions.categoryId = [];
+			}
+		} catch (error) {
+			console.error('❌ Failed to load categories:', error);
+			// Fallback: try the alternative categories query format
+			await this.loadCategoriesAlt();
+		}
+	}
+
+	private async loadCategoriesAlt() {
+		try {
+			// Alternative query - some Craft setups might structure categories differently
+			const altCategoriesQuery = `
+				query GetCategoriesAlt {
+					entries(section: "categories", limit: 50) {
+						id
+						title
+						... on categories_Category {
+							slug
+						}
+					}
+				}
+			`;
+
+			const response = await requestUrl({
+				url: this.plugin.settings.endpoint,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${this.plugin.settings.token}`
+				},
+				body: JSON.stringify({
+					query: altCategoriesQuery
+				})
+			});
+			
+			if (response.json?.data?.entries) {
+				const categories = response.json.data.entries.map((category: any) => ({
+					value: category.id,
+					label: category.title
+				}));
+
+				this.dropdownOptions.category = categories;
+				this.dropdownOptions.categories = categories;
+				this.dropdownOptions.categoryId = categories;
+				
+				console.log(`✅ Loaded ${categories.length} categories (alternative method)`);
+			} else {
+				console.log('ℹ️ No categories found via alternative method either');
+				this.dropdownOptions.category = [];
+				this.dropdownOptions.categories = [];
+				this.dropdownOptions.categoryId = [];
+			}
+		} catch (error) {
+			console.error('❌ Alternative categories query also failed:', error);
+			this.dropdownOptions.category = [];
+			this.dropdownOptions.categories = [];
+			this.dropdownOptions.categoryId = [];
+		}
+	}
+
 	private async prefillFromFrontmatter() {
 		if (!this.currentFile) return;
 
@@ -136,6 +319,14 @@ export class TabbedUploadModal extends Modal {
 				postDate: frontmatter.postDate || frontmatter.date || new Date().toISOString().split('T')[0],
 				enabled: frontmatter.enabled ?? true,
 				tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.join(', ') : '',
+				// Handle author field - could be ID or name
+				postAuthor: frontmatter.postAuthor || frontmatter.author || frontmatter.authorId || '',
+				author: frontmatter.postAuthor || frontmatter.author || frontmatter.authorId || '',
+				authorId: frontmatter.postAuthor || frontmatter.author || frontmatter.authorId || '',
+				// Handle category field - could be ID or name
+				category: frontmatter.category || frontmatter.categoryId || '',
+				categories: frontmatter.categories || frontmatter.category || frontmatter.categoryId || '',
+				categoryId: frontmatter.category || frontmatter.categoryId || '',
 				...frontmatter
 			};
 
@@ -305,35 +496,61 @@ export class TabbedUploadModal extends Modal {
 		let input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 		const inputContainer = fieldContainer.createDiv('field-input-container');
 
-		switch (field.type) {
-			case 'textarea':
-				input = inputContainer.createEl('textarea', { cls: 'field-input' });
-				(input as HTMLTextAreaElement).rows = field.name === 'body' ? 8 : 4;
-				break;
-			case 'checkbox':
-				const checkboxContainer = inputContainer.createDiv('checkbox-container');
-				input = checkboxContainer.createEl('input', { type: 'checkbox', cls: 'field-checkbox' });
-				checkboxContainer.createSpan({ text: 'Enable', cls: 'checkbox-label' });
-				break;
-			case 'select':
-				input = inputContainer.createEl('select', { cls: 'field-input' });
-				if (field.options) {
-					field.options.forEach(option => {
-						const opt = (input as HTMLSelectElement).createEl('option');
-						opt.value = option.value;
-						opt.textContent = option.label;
+		// Check if this field should be a dropdown
+		const hasDropdownOptions = this.dropdownOptions[field.name] && 
+									this.dropdownOptions[field.name].length > 0;
+
+		if (hasDropdownOptions) {
+			// Create dropdown for fields with predefined options
+			input = inputContainer.createEl('select', { cls: 'field-input' });
+			const selectInput = input as HTMLSelectElement;
+			
+			// Add empty option
+			const emptyOption = selectInput.createEl('option');
+			emptyOption.value = '';
+			emptyOption.textContent = `Select ${field.label}...`;
+			
+			// Add options from our loaded data
+			this.dropdownOptions[field.name].forEach(option => {
+				const opt = selectInput.createEl('option');
+				opt.value = option.value;
+				opt.textContent = option.label;
+			});
+
+			console.log(`🎯 Created dropdown for ${field.name} with ${this.dropdownOptions[field.name].length} options`);
+		} else {
+			// Use the original field type logic
+			switch (field.type) {
+				case 'textarea':
+					input = inputContainer.createEl('textarea', { cls: 'field-input' });
+					(input as HTMLTextAreaElement).rows = field.name === 'body' ? 8 : 4;
+					break;
+				case 'checkbox':
+					const checkboxContainer = inputContainer.createDiv('checkbox-container');
+					input = checkboxContainer.createEl('input', { type: 'checkbox', cls: 'field-checkbox' });
+					checkboxContainer.createSpan({ text: 'Enable', cls: 'checkbox-label' });
+					break;
+				case 'select':
+					input = inputContainer.createEl('select', { cls: 'field-input' });
+					if (field.options) {
+						field.options.forEach(option => {
+							const opt = (input as HTMLSelectElement).createEl('option');
+							opt.value = option.value;
+							opt.textContent = option.label;
+						});
+					}
+					break;
+				default:
+					input = inputContainer.createEl('input', { 
+						type: field.type, 
+						cls: 'field-input'
 					});
-				}
-				break;
-			default:
-				input = inputContainer.createEl('input', { 
-					type: field.type, 
-					cls: 'field-input'
-				});
+			}
 		}
 
 		// Set placeholder and initial value
-		if (field.placeholder && (field.type !== 'select' && field.type !== 'checkbox')) {
+		if (field.placeholder && !hasDropdownOptions && 
+			(field.type !== 'select' && field.type !== 'checkbox')) {
 			(input as HTMLInputElement | HTMLTextAreaElement).placeholder = field.placeholder;
 		}
 
@@ -353,6 +570,7 @@ export class TabbedUploadModal extends Modal {
 			} else {
 				this.formData[field.name] = input.value;
 			}
+			console.log(`📝 Updated ${field.name}:`, this.formData[field.name]);
 		});
 	}
 
@@ -378,8 +596,34 @@ export class TabbedUploadModal extends Modal {
 			this.asDraft = draftCheckbox.checked;
 		});
 
+		// Add dropdown status info
+		this.showDropdownStatus(optionsGrid);
+
 		// Validation status
 		this.showValidationStatus(optionsGrid);
+	}
+
+	private showDropdownStatus(container: HTMLElement) {
+		const statusCard = container.createDiv('status-card dropdown-status');
+		
+		const authorCount = this.dropdownOptions.postAuthor?.length || 0;
+		const categoryCount = this.dropdownOptions.category?.length || 0;
+		
+		statusCard.innerHTML = `
+			<div class="status-header">
+				<span class="status-icon">📊</span>
+				<span class="status-title">Dropdown Data</span>
+			</div>
+			<div class="status-description">
+				${authorCount} authors, ${categoryCount} categories loaded
+			</div>
+		`;
+
+		if (authorCount === 0 && categoryCount === 0) {
+			statusCard.addClass('status-warning');
+		} else {
+			statusCard.addClass('status-success');
+		}
 	}
 
 	private async showValidationStatus(container: HTMLElement) {
@@ -464,7 +708,7 @@ export class TabbedUploadModal extends Modal {
 		try {
 			new Notice('🚀 Starting smart upload...');
 
-			// Convert form data to PostData format (same as before)
+			// Convert form data to PostData format
 			const postData: PostData = {
 				title: this.formData.title || '',
 				body: this.formData.body || '',
@@ -483,6 +727,8 @@ export class TabbedUploadModal extends Modal {
 					)
 				)
 			};
+
+			console.log('📤 Smart upload data with dropdowns:', postData);
 
 			await this.plugin.uploadPost(this.currentFile, { asDraft: this.asDraft });
 			new Notice(`✅ Successfully uploaded as ${this.selectedContentType.name}!`);
@@ -616,78 +862,105 @@ export class TabbedUploadModal extends Modal {
 				/* Tab content */
 				.tab-content {
 					flex: 1;
-					padding: 24px;
+					padding: 20px;
 					overflow-y: auto;
+					background: var(--background-primary);
 				}
 
 				.empty-tab {
 					text-align: center;
-					padding: 60px 20px;
+					padding: 40px 20px;
 					color: var(--text-muted);
 				}
 
 				.empty-tab-icon {
-					font-size: 3rem;
-					margin-bottom: 16px;
+					font-size: 2.5rem;
+					margin-bottom: 12px;
+					opacity: 0.6;
 				}
 
 				.empty-tab h3 {
-					margin: 0 0 8px 0;
+					margin: 0 0 6px 0;
+					font-size: 1.1rem;
+				}
+
+				.empty-tab p {
+					margin: 0;
+					font-size: 0.9rem;
+					opacity: 0.8;
 				}
 
 				/* Fields grid */
 				.fields-grid {
 					display: grid;
-					gap: 24px;
+					gap: 20px;
+					max-width: 100%;
 				}
 
 				.tab-form-field {
 					border: 1px solid var(--background-modifier-border);
 					border-radius: 8px;
-					padding: 20px;
+					padding: 16px;
 					background: var(--background-primary);
+					box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+					transition: all 0.2s ease;
+				}
+
+				.tab-form-field:hover {
+					border-color: var(--interactive-accent);
+					box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
 				}
 
 				.field-header {
-					margin-bottom: 12px;
+					margin-bottom: 8px;
 				}
 
 				.field-label {
 					display: block;
-					margin-bottom: 4px;
+					margin-bottom: 6px;
 				}
 
 				.field-name {
 					font-weight: 600;
 					color: var(--text-normal);
+					font-size: 0.9rem;
 				}
 
 				.required-indicator {
 					color: var(--text-error);
-					margin-left: 4px;
+					margin-left: 2px;
+					font-weight: bold;
 				}
 
 				.field-description {
-					font-size: 0.85rem;
+					font-size: 0.8rem;
 					color: var(--text-muted);
-					margin-top: 4px;
+					margin-top: 2px;
+					line-height: 1.3;
 				}
 
 				.field-input {
 					width: 100%;
-					padding: 12px 16px;
+					padding: 10px 12px;
 					border: 2px solid var(--background-modifier-border);
 					border-radius: 6px;
-					font-size: 14px;
+					font-size: 13px;
 					background: var(--background-primary);
 					color: var(--text-normal);
-					transition: border-color 0.2s ease;
+					transition: all 0.2s ease;
+					font-family: var(--font-interface);
 				}
 
 				.field-input:focus {
 					outline: none;
 					border-color: var(--interactive-accent);
-					box-shadow: 0 0 0 3px var(--interactive-accent-hover);
+					box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+					background: var(--background-primary);
+				}
+
+				.field-input::placeholder {
+					color: var(--text-faint);
+					opacity: 0.8;
 				}
 
 				.checkbox-container {
@@ -706,52 +979,64 @@ export class TabbedUploadModal extends Modal {
 
 				/* Upload options */
 				.upload-options-section {
-					margin-top: 32px;
-					padding-top: 24px;
+					margin-top: 24px;
+					padding-top: 20px;
 					border-top: 1px solid var(--background-modifier-border);
 				}
 
 				.upload-options-section h3 {
-					margin: 0 0 16px 0;
+					margin: 0 0 12px 0;
+					font-size: 1rem;
+					color: var(--text-normal);
 				}
 
 				.options-grid {
 					display: grid;
-					grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-					gap: 16px;
+					grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+					gap: 12px;
 				}
 
 				.option-card,
 				.status-card {
 					border: 1px solid var(--background-modifier-border);
-					border-radius: 8px;
-					padding: 16px;
+					border-radius: 6px;
+					padding: 12px;
 					position: relative;
+					font-size: 0.85rem;
+					transition: all 0.2s ease;
+				}
+
+				.option-card:hover {
+					border-color: var(--interactive-accent);
+					background: var(--background-modifier-hover);
 				}
 
 				.option-header,
 				.status-header {
 					display: flex;
 					align-items: center;
-					gap: 8px;
-					margin-bottom: 4px;
+					gap: 6px;
+					margin-bottom: 2px;
 				}
 
 				.option-title,
 				.status-title {
 					font-weight: 500;
+					font-size: 0.85rem;
 				}
 
 				.option-description,
 				.status-description {
-					font-size: 0.85rem;
+					font-size: 0.8rem;
 					color: var(--text-muted);
+					line-height: 1.3;
 				}
 
 				.option-checkbox {
 					position: absolute;
-					top: 16px;
-					right: 16px;
+					top: 12px;
+					right: 12px;
+					transform: scale(0.9);
 				}
 
 				.status-card.status-success {
@@ -767,6 +1052,11 @@ export class TabbedUploadModal extends Modal {
 				.status-card.status-warning {
 					border-color: var(--text-warning);
 					background: rgba(245, 158, 11, 0.1);
+				}
+
+				.dropdown-status {
+					border-color: var(--interactive-accent);
+					background: rgba(102, 126, 234, 0.1);
 				}
 
 				/* Footer */
