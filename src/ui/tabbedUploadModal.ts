@@ -79,9 +79,9 @@ export class TabbedUploadModal extends Modal {
 		setTimeout(() => {
 			const modalEl = this.containerEl.querySelector('.modal') as HTMLElement;
 			if (modalEl) {
-				modalEl.style.maxWidth = '1000px';
-				modalEl.style.width = '1000px';
-				modalEl.style.minHeight = '700px';
+				modalEl.style.maxWidth = '1200px';
+				modalEl.style.width = '1200px';
+				modalEl.style.minHeight = '800px';
 				modalEl.addClass('mod-tabbed-upload');
 			}
 		}, 50);
@@ -747,9 +747,13 @@ export class TabbedUploadModal extends Modal {
 			style.textContent = `
 				/* Modal sizing */
 				.modal.mod-tabbed-upload {
-					max-width: 1000px !important;
-					width: 1000px !important;
-					min-height: 700px !important;
+					max-width: 1200px !important;
+					width: 1200px !important;
+					min-height: 800px !important;
+				}
+					
+				.modal.mod-tabbed-upload .modal-content * {
+					font-size: 16px !important;
 				}
 
 				.modal.mod-tabbed-upload .modal-content {
@@ -778,22 +782,24 @@ export class TabbedUploadModal extends Modal {
 				}
 
 				.header-left h2 {
-					margin: 0 0 4px 0;
-					font-size: 1.5rem;
+					margin: 0 0 2px 0;
 				}
 
 				.header-left p {
 					margin: 0;
 					opacity: 0.9;
+					font-weight: 400;
 				}
 
 				.content-type-select {
 					background: rgba(255, 255, 255, 0.2);
 					border: 1px solid rgba(255, 255, 255, 0.3);
 					color: white;
-					padding: 8px 12px;
-					border-radius: 6px;
-					font-size: 0.9rem;
+					padding: 4px 8px;
+					border-radius: 4px;
+					min-width: 200px;
+					max-width: 280px;
+					font-weight: 400;
 				}
 
 				.content-type-select option {
@@ -804,7 +810,7 @@ export class TabbedUploadModal extends Modal {
 				/* Main content */
 				.tabbed-main-content {
 					display: flex;
-					height: 600px;
+					height: 700px;
 				}
 
 				/* Tab navigation */
@@ -817,13 +823,14 @@ export class TabbedUploadModal extends Modal {
 				}
 
 				.tab-button {
-					padding: 12px 20px;
+					padding: 8px 12px;
 					cursor: pointer;
 					display: flex;
 					align-items: center;
-					gap: 12px;
+					gap: 8px;
 					transition: all 0.2s ease;
 					border-left: 3px solid transparent;
+					font-weight: 400;
 				}
 
 				.tab-button:hover {
@@ -831,13 +838,13 @@ export class TabbedUploadModal extends Modal {
 				}
 
 				.tab-button.active {
-					background: var(--interactive-accent-hover);
+					background: var(--background-modifier-hover);
 					border-left-color: var(--interactive-accent);
 					color: var(--interactive-accent);
 				}
 
 				.tab-icon {
-					font-size: 1.1rem;
+					flex-shrink: 0;
 				}
 
 				.tab-name {
@@ -846,12 +853,14 @@ export class TabbedUploadModal extends Modal {
 				}
 
 				.tab-count {
-					background: var(--background-modifier-border);
-					padding: 2px 6px;
-					border-radius: 10px;
-					font-size: 0.75rem;
-					min-width: 20px;
+					background: var(--text-muted);
+					color: var(--background-primary);
+					padding: 1px 4px;
+					border-radius: 6px;
+					font-weight: 600;
+					min-width: 16px;
 					text-align: center;
+					flex-shrink: 0;
 				}
 
 				.tab-button.active .tab-count {
@@ -874,19 +883,16 @@ export class TabbedUploadModal extends Modal {
 				}
 
 				.empty-tab-icon {
-					font-size: 2.5rem;
 					margin-bottom: 12px;
 					opacity: 0.6;
 				}
 
 				.empty-tab h3 {
 					margin: 0 0 6px 0;
-					font-size: 1.1rem;
 				}
 
 				.empty-tab p {
 					margin: 0;
-					font-size: 0.9rem;
 					opacity: 0.8;
 				}
 
@@ -923,7 +929,6 @@ export class TabbedUploadModal extends Modal {
 				.field-name {
 					font-weight: 600;
 					color: var(--text-normal);
-					font-size: 0.9rem;
 				}
 
 				.required-indicator {
@@ -933,18 +938,18 @@ export class TabbedUploadModal extends Modal {
 				}
 
 				.field-description {
-					font-size: 0.8rem;
 					color: var(--text-muted);
 					margin-top: 2px;
 					line-height: 1.3;
+					font-weight: 400;
 				}
 
 				.field-input {
 					width: 100%;
-					padding: 10px 12px;
+					padding: 8px 10px;
 					border: 2px solid var(--background-modifier-border);
-					border-radius: 6px;
-					font-size: 13px;
+					border-radius: 4px;
+					font-weight: 400;
 					background: var(--background-primary);
 					color: var(--text-normal);
 					transition: all 0.2s ease;
@@ -986,7 +991,6 @@ export class TabbedUploadModal extends Modal {
 
 				.upload-options-section h3 {
 					margin: 0 0 12px 0;
-					font-size: 1rem;
 					color: var(--text-normal);
 				}
 
@@ -1002,7 +1006,6 @@ export class TabbedUploadModal extends Modal {
 					border-radius: 6px;
 					padding: 12px;
 					position: relative;
-					font-size: 0.85rem;
 					transition: all 0.2s ease;
 				}
 
@@ -1016,27 +1019,28 @@ export class TabbedUploadModal extends Modal {
 					display: flex;
 					align-items: center;
 					gap: 6px;
-					margin-bottom: 2px;
+					margin-bottom: 4px;
 				}
 
 				.option-title,
 				.status-title {
-					font-weight: 500;
-					font-size: 0.85rem;
+					font-weight: 600;
 				}
 
 				.option-description,
 				.status-description {
-					font-size: 0.8rem;
+					font-weight: 400;
 					color: var(--text-muted);
 					line-height: 1.3;
+					margin-right: 24px; /* Space for checkbox */
 				}
 
 				.option-checkbox {
 					position: absolute;
-					top: 12px;
-					right: 12px;
-					transform: scale(0.9);
+					top: 10px;
+					right: 10px;
+					transform: scale(0.8);
+					z-index: 10;
 				}
 
 				.status-card.status-success {
@@ -1070,7 +1074,7 @@ export class TabbedUploadModal extends Modal {
 				}
 
 				.footer-info {
-					font-size: 0.85rem;
+					font-weight: 400;
 					color: var(--text-muted);
 				}
 

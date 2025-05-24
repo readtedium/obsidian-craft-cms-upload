@@ -263,7 +263,7 @@ var R=Object.defineProperty;var oe=Object.getOwnPropertyDescriptor;var ie=Object
 				.schema-retry-btn:hover {
 					opacity: 0.9;
 				}
-			`,document.head.appendChild(e)}}onClose(){let{contentEl:e}=this;e.empty()}}});var de={};V(de,{default:()=>N});module.exports=ce(de);var p=require("obsidian");var G=require("obsidian"),T=class{constructor(n){this.settings=n}async makeRequest(n,e){return(await(0,G.requestUrl)({url:this.settings.endpoint,method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${this.settings.token}`},body:JSON.stringify({query:n,variables:e})})).json}async testConnection(){let n=`
+			`,document.head.appendChild(e)}}onClose(){let{contentEl:e}=this;e.empty()}}});var de={};V(de,{default:()=>N});module.exports=ce(de);var p=require("obsidian");var G=require("obsidian"),k=class{constructor(n){this.settings=n}async makeRequest(n,e){return(await(0,G.requestUrl)({url:this.settings.endpoint,method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${this.settings.token}`},body:JSON.stringify({query:n,variables:e})})).json}async testConnection(){let n=`
 			query TestConnection {
 				entries(section: "${this.settings.sectionHandle}", limit: 1) {
 					id
@@ -638,7 +638,7 @@ ${Object.entries(n).map(([r,o])=>{let i=typeof o=="string"?`"${o}"`:o;return`${r
 `)}
 ---
 
-${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_-]+/g,"-").replace(/^-+|-+$/g,"")}function K(l){return l?l.replace(/[<>:"/\\|?*@]/g,"-").replace(/^\.+/,"").replace(/\.+$/,"").replace(/-+/g,"-").replace(/^-|-$/g,"").substring(0,100):""}function P(l){try{let n=new URL(l),e=n.pathname.split("/").pop()||"";if(e=e.split("?")[0],!e||e.length<3||e.includes("@")||e.startsWith("bafkrei")||e.length>50){let t=n.hostname.replace(/^www\./,""),a=Date.now().toString(36);e=`${t}-${a}.jpg`}return e.match(/\.(jpg|jpeg|png|gif|webp)$/i)||(l.toLowerCase().includes("png")?e+=".png":l.toLowerCase().includes("gif")?e+=".gif":l.toLowerCase().includes("webp")?e+=".webp":e+=".jpg"),e=e.replace(/[^a-zA-Z0-9.-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,""),console.log("\u{1F3F7}\uFE0F Generated filename from URL:",e),e}catch(n){return console.warn("Could not parse URL, using default filename"),`image-${Date.now()}.jpg`}}function ee(l){let n=l.toLowerCase().split(".").pop();return{jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml"}[n||""]||"image/jpeg"}function te(l){let n=new Uint8Array(l),e="";for(let t=0;t<n.byteLength;t++)e+=String.fromCharCode(n[t]);return btoa(e)}var I=class extends f.Modal{constructor(e,t){super(e);this.selectedContentType=null;this.availableContentTypes=[];this.formFields=[];this.formData={};this.currentFile=null;this.asDraft=!1;this.plugin=t}async onOpen(){let{contentEl:e}=this;e.empty();let t=this.app.workspace.getActiveViewOfType(f.MarkdownView);if(!(t!=null&&t.file)){new f.Notice("No active file found"),this.close();return}this.currentFile=t.file,this.addModalStyles(),await this.loadContentTypes(),await this.prefillFromFrontmatter(),this.render(),setTimeout(()=>{let a=this.containerEl.querySelector(".modal");a&&(a.style.maxWidth="900px",a.style.width="900px",a.style.minHeight="600px",a.addClass("mod-dynamic-upload-sized"))},50)}async loadContentTypes(){try{if(new f.Notice("\u{1F50D} Loading content types..."),this.availableContentTypes=await this.plugin.schemaManager.getContentTypesForSection(this.plugin.settings.sectionHandle),this.availableContentTypes.length===0)throw new Error("No content types found for this section");this.selectedContentType=this.availableContentTypes[0],await this.loadFormFields()}catch(e){console.error("\u{1F4A5} Failed to load content types:",e),new f.Notice(`Failed to load content types: ${e.message}`),this.close()}}async loadFormFields(){if(this.selectedContentType)try{this.formFields=await this.plugin.schemaManager.getFormFields(this.selectedContentType.handle),console.log(`\u{1F4CB} Loaded ${this.formFields.length} fields for ${this.selectedContentType.name}`)}catch(e){console.error("\u{1F4A5} Failed to load form fields:",e),new f.Notice(`Failed to load form fields: ${e.message}`)}}async prefillFromFrontmatter(){var e;if(this.currentFile)try{let t=await this.app.vault.read(this.currentFile),{frontmatter:a,body:r}=C(t);this.formData={title:a.title||this.currentFile.basename,body:r,slug:a.slug||k(a.title||this.currentFile.basename),deck:a.deck||"",shortDeck:a.shortDeck||a.description||"",metaHeadline:a.metaHeadline||a.title||"",metaDescription:a.metaDescription||a.description||"",postDate:a.postDate||a.date||new Date().toISOString().split("T")[0],enabled:(e=a.enabled)!=null?e:!0,tags:Array.isArray(a.tags)?a.tags.join(", "):"",...a}}catch(t){console.error("\u26A0\uFE0F Failed to parse frontmatter:",t)}}render(){let{contentEl:e}=this;e.empty();let t=e.createDiv("dynamic-upload-header");t.innerHTML=`
+${l}`}function T(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_-]+/g,"-").replace(/^-+|-+$/g,"")}function K(l){return l?l.replace(/[<>:"/\\|?*@]/g,"-").replace(/^\.+/,"").replace(/\.+$/,"").replace(/-+/g,"-").replace(/^-|-$/g,"").substring(0,100):""}function P(l){try{let n=new URL(l),e=n.pathname.split("/").pop()||"";if(e=e.split("?")[0],!e||e.length<3||e.includes("@")||e.startsWith("bafkrei")||e.length>50){let t=n.hostname.replace(/^www\./,""),a=Date.now().toString(36);e=`${t}-${a}.jpg`}return e.match(/\.(jpg|jpeg|png|gif|webp)$/i)||(l.toLowerCase().includes("png")?e+=".png":l.toLowerCase().includes("gif")?e+=".gif":l.toLowerCase().includes("webp")?e+=".webp":e+=".jpg"),e=e.replace(/[^a-zA-Z0-9.-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,""),console.log("\u{1F3F7}\uFE0F Generated filename from URL:",e),e}catch(n){return console.warn("Could not parse URL, using default filename"),`image-${Date.now()}.jpg`}}function ee(l){let n=l.toLowerCase().split(".").pop();return{jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml"}[n||""]||"image/jpeg"}function te(l){let n=new Uint8Array(l),e="";for(let t=0;t<n.byteLength;t++)e+=String.fromCharCode(n[t]);return btoa(e)}var I=class extends f.Modal{constructor(e,t){super(e);this.selectedContentType=null;this.availableContentTypes=[];this.formFields=[];this.formData={};this.currentFile=null;this.asDraft=!1;this.plugin=t}async onOpen(){let{contentEl:e}=this;e.empty();let t=this.app.workspace.getActiveViewOfType(f.MarkdownView);if(!(t!=null&&t.file)){new f.Notice("No active file found"),this.close();return}this.currentFile=t.file,this.addModalStyles(),await this.loadContentTypes(),await this.prefillFromFrontmatter(),this.render(),setTimeout(()=>{let a=this.containerEl.querySelector(".modal");a&&(a.style.maxWidth="900px",a.style.width="900px",a.style.minHeight="600px",a.addClass("mod-dynamic-upload-sized"))},50)}async loadContentTypes(){try{if(new f.Notice("\u{1F50D} Loading content types..."),this.availableContentTypes=await this.plugin.schemaManager.getContentTypesForSection(this.plugin.settings.sectionHandle),this.availableContentTypes.length===0)throw new Error("No content types found for this section");this.selectedContentType=this.availableContentTypes[0],await this.loadFormFields()}catch(e){console.error("\u{1F4A5} Failed to load content types:",e),new f.Notice(`Failed to load content types: ${e.message}`),this.close()}}async loadFormFields(){if(this.selectedContentType)try{this.formFields=await this.plugin.schemaManager.getFormFields(this.selectedContentType.handle),console.log(`\u{1F4CB} Loaded ${this.formFields.length} fields for ${this.selectedContentType.name}`)}catch(e){console.error("\u{1F4A5} Failed to load form fields:",e),new f.Notice(`Failed to load form fields: ${e.message}`)}}async prefillFromFrontmatter(){var e;if(this.currentFile)try{let t=await this.app.vault.read(this.currentFile),{frontmatter:a,body:r}=C(t);this.formData={title:a.title||this.currentFile.basename,body:r,slug:a.slug||T(a.title||this.currentFile.basename),deck:a.deck||"",shortDeck:a.shortDeck||a.description||"",metaHeadline:a.metaHeadline||a.title||"",metaDescription:a.metaDescription||a.description||"",postDate:a.postDate||a.date||new Date().toISOString().split("T")[0],enabled:(e=a.enabled)!=null?e:!0,tags:Array.isArray(a.tags)?a.tags.join(", "):"",...a}}catch(t){console.error("\u26A0\uFE0F Failed to parse frontmatter:",t)}}render(){let{contentEl:e}=this;e.empty();let t=e.createDiv("dynamic-upload-header");t.innerHTML=`
 			<div class="dynamic-header-content">
 				<svg class="dynamic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<path d="M12 2L22 8.5V15.5L12 22L2 15.5V8.5L12 2Z"/>
@@ -970,7 +970,7 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 					background: var(--background-modifier-hover);
 					border-color: var(--text-muted);
 				}
-			`,document.head.appendChild(e)}}onClose(){let{contentEl:e}=this;e.empty()}};var g=require("obsidian");var O=class extends g.Modal{constructor(e,t){super(e);this.selectedContentType=null;this.availableContentTypes=[];this.formFields=[];this.formData={};this.currentFile=null;this.asDraft=!1;this.activeTab="article";this.dropdownOptions={};this.tabs={article:{name:"Article",icon:"\u{1F4C4}",fields:["title","body","deck","shortDeck","slug","postDate","enabled"]},meta:{name:"Meta",icon:"\u{1F3AF}",fields:["metaHeadline","metaDescription","metaCode","featuredUrl"]},social:{name:"Social",icon:"\u{1F4F1}",fields:["socialBlurb","numberBlurb","repost","renderEmail"]},taxonomy:{name:"Taxonomy",icon:"\u{1F3F7}\uFE0F",fields:["tags","category","postAuthor","categories"]},media:{name:"Media",icon:"\u{1F5BC}\uFE0F",fields:["image","featuredImage","sidebarAd","topAd"]},advanced:{name:"Advanced",icon:"\u2699\uFE0F",fields:[]}};this.plugin=t}async onOpen(){let{contentEl:e}=this;e.empty();let t=this.app.workspace.getActiveViewOfType(g.MarkdownView);if(!(t!=null&&t.file)){new g.Notice("No active file found"),this.close();return}this.currentFile=t.file,this.addModalStyles(),await this.loadContentTypes(),await this.loadDropdownOptions(),await this.prefillFromFrontmatter(),this.organizeFieldsByTabs(),this.render(),setTimeout(()=>{let a=this.containerEl.querySelector(".modal");a&&(a.style.maxWidth="1000px",a.style.width="1000px",a.style.minHeight="700px",a.addClass("mod-tabbed-upload"))},50)}async loadContentTypes(){try{if(new g.Notice("\u{1F50D} Loading content types..."),this.availableContentTypes=await this.plugin.schemaManager.getContentTypesForSection(this.plugin.settings.sectionHandle),this.availableContentTypes.length===0)throw new Error("No content types found for this section");this.selectedContentType=this.availableContentTypes[0],await this.loadFormFields()}catch(e){console.error("\u{1F4A5} Failed to load content types:",e),new g.Notice(`Failed to load content types: ${e.message}`),this.close()}}async loadFormFields(){if(this.selectedContentType)try{this.formFields=await this.plugin.schemaManager.getFormFields(this.selectedContentType.handle),console.log(`\u{1F4CB} Loaded ${this.formFields.length} fields for ${this.selectedContentType.name}`)}catch(e){console.error("\u{1F4A5} Failed to load form fields:",e),new g.Notice(`Failed to load form fields: ${e.message}`)}}async loadDropdownOptions(){try{console.log("\u{1F50D} Loading dropdown options..."),this.dropdownOptions={},await Promise.all([this.loadAuthors(),this.loadCategories()]),console.log("\u{1F4CB} Loaded dropdown options:",this.dropdownOptions)}catch(e){console.error("\u26A0\uFE0F Failed to load dropdown options:",e)}}async loadAuthors(){var e,t;try{let a=`
+			`,document.head.appendChild(e)}}onClose(){let{contentEl:e}=this;e.empty()}};var g=require("obsidian");var O=class extends g.Modal{constructor(e,t){super(e);this.selectedContentType=null;this.availableContentTypes=[];this.formFields=[];this.formData={};this.currentFile=null;this.asDraft=!1;this.activeTab="article";this.dropdownOptions={};this.tabs={article:{name:"Article",icon:"\u{1F4C4}",fields:["title","body","deck","shortDeck","slug","postDate","enabled"]},meta:{name:"Meta",icon:"\u{1F3AF}",fields:["metaHeadline","metaDescription","metaCode","featuredUrl"]},social:{name:"Social",icon:"\u{1F4F1}",fields:["socialBlurb","numberBlurb","repost","renderEmail"]},taxonomy:{name:"Taxonomy",icon:"\u{1F3F7}\uFE0F",fields:["tags","category","postAuthor","categories"]},media:{name:"Media",icon:"\u{1F5BC}\uFE0F",fields:["image","featuredImage","sidebarAd","topAd"]},advanced:{name:"Advanced",icon:"\u2699\uFE0F",fields:[]}};this.plugin=t}async onOpen(){let{contentEl:e}=this;e.empty();let t=this.app.workspace.getActiveViewOfType(g.MarkdownView);if(!(t!=null&&t.file)){new g.Notice("No active file found"),this.close();return}this.currentFile=t.file,this.addModalStyles(),await this.loadContentTypes(),await this.loadDropdownOptions(),await this.prefillFromFrontmatter(),this.organizeFieldsByTabs(),this.render(),setTimeout(()=>{let a=this.containerEl.querySelector(".modal");a&&(a.style.maxWidth="1200px",a.style.width="1200px",a.style.minHeight="800px",a.addClass("mod-tabbed-upload"))},50)}async loadContentTypes(){try{if(new g.Notice("\u{1F50D} Loading content types..."),this.availableContentTypes=await this.plugin.schemaManager.getContentTypesForSection(this.plugin.settings.sectionHandle),this.availableContentTypes.length===0)throw new Error("No content types found for this section");this.selectedContentType=this.availableContentTypes[0],await this.loadFormFields()}catch(e){console.error("\u{1F4A5} Failed to load content types:",e),new g.Notice(`Failed to load content types: ${e.message}`),this.close()}}async loadFormFields(){if(this.selectedContentType)try{this.formFields=await this.plugin.schemaManager.getFormFields(this.selectedContentType.handle),console.log(`\u{1F4CB} Loaded ${this.formFields.length} fields for ${this.selectedContentType.name}`)}catch(e){console.error("\u{1F4A5} Failed to load form fields:",e),new g.Notice(`Failed to load form fields: ${e.message}`)}}async loadDropdownOptions(){try{console.log("\u{1F50D} Loading dropdown options..."),this.dropdownOptions={},await Promise.all([this.loadAuthors(),this.loadCategories()]),console.log("\u{1F4CB} Loaded dropdown options:",this.dropdownOptions)}catch(e){console.error("\u26A0\uFE0F Failed to load dropdown options:",e)}}async loadAuthors(){var e,t;try{let a=`
 				query GetAuthors {
 					entries(section: "author", limit: 50) {
 						id
@@ -999,7 +999,7 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 						}
 					}
 				}
-			`,r=await(0,g.requestUrl)({url:this.plugin.settings.endpoint,method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${this.plugin.settings.token}`},body:JSON.stringify({query:a})});if((t=(e=r.json)==null?void 0:e.data)!=null&&t.entries){let o=r.json.data.entries.map(i=>({value:i.id,label:i.title}));this.dropdownOptions.category=o,this.dropdownOptions.categories=o,this.dropdownOptions.categoryId=o,console.log(`\u2705 Loaded ${o.length} categories (alternative method)`)}else console.log("\u2139\uFE0F No categories found via alternative method either"),this.dropdownOptions.category=[],this.dropdownOptions.categories=[],this.dropdownOptions.categoryId=[]}catch(a){console.error("\u274C Alternative categories query also failed:",a),this.dropdownOptions.category=[],this.dropdownOptions.categories=[],this.dropdownOptions.categoryId=[]}}async prefillFromFrontmatter(){var e;if(this.currentFile)try{let t=await this.app.vault.read(this.currentFile),{frontmatter:a,body:r}=C(t);this.formData={title:a.title||this.currentFile.basename,body:r,slug:a.slug||k(a.title||this.currentFile.basename),deck:a.deck||"",shortDeck:a.shortDeck||a.description||"",metaHeadline:a.metaHeadline||a.title||"",metaDescription:a.metaDescription||a.description||"",postDate:a.postDate||a.date||new Date().toISOString().split("T")[0],enabled:(e=a.enabled)!=null?e:!0,tags:Array.isArray(a.tags)?a.tags.join(", "):"",postAuthor:a.postAuthor||a.author||a.authorId||"",author:a.postAuthor||a.author||a.authorId||"",authorId:a.postAuthor||a.author||a.authorId||"",category:a.category||a.categoryId||"",categories:a.categories||a.category||a.categoryId||"",categoryId:a.category||a.categoryId||"",...a}}catch(t){console.error("\u26A0\uFE0F Failed to parse frontmatter:",t)}}organizeFieldsByTabs(){let e=new Set;Object.values(this.tabs).forEach(t=>{t.fields&&t.fields.forEach(a=>e.add(a))}),this.tabs.advanced.fields=this.formFields.filter(t=>!e.has(t.name)).map(t=>t.name)}render(){let{contentEl:e}=this;e.empty(),this.renderHeader(e);let t=e.createDiv("tabbed-main-content");this.renderTabNavigation(t),this.renderTabContent(t),this.renderFooter(e)}renderHeader(e){let t=e.createDiv("tabbed-upload-header");t.innerHTML=`
+			`,r=await(0,g.requestUrl)({url:this.plugin.settings.endpoint,method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${this.plugin.settings.token}`},body:JSON.stringify({query:a})});if((t=(e=r.json)==null?void 0:e.data)!=null&&t.entries){let o=r.json.data.entries.map(i=>({value:i.id,label:i.title}));this.dropdownOptions.category=o,this.dropdownOptions.categories=o,this.dropdownOptions.categoryId=o,console.log(`\u2705 Loaded ${o.length} categories (alternative method)`)}else console.log("\u2139\uFE0F No categories found via alternative method either"),this.dropdownOptions.category=[],this.dropdownOptions.categories=[],this.dropdownOptions.categoryId=[]}catch(a){console.error("\u274C Alternative categories query also failed:",a),this.dropdownOptions.category=[],this.dropdownOptions.categories=[],this.dropdownOptions.categoryId=[]}}async prefillFromFrontmatter(){var e;if(this.currentFile)try{let t=await this.app.vault.read(this.currentFile),{frontmatter:a,body:r}=C(t);this.formData={title:a.title||this.currentFile.basename,body:r,slug:a.slug||T(a.title||this.currentFile.basename),deck:a.deck||"",shortDeck:a.shortDeck||a.description||"",metaHeadline:a.metaHeadline||a.title||"",metaDescription:a.metaDescription||a.description||"",postDate:a.postDate||a.date||new Date().toISOString().split("T")[0],enabled:(e=a.enabled)!=null?e:!0,tags:Array.isArray(a.tags)?a.tags.join(", "):"",postAuthor:a.postAuthor||a.author||a.authorId||"",author:a.postAuthor||a.author||a.authorId||"",authorId:a.postAuthor||a.author||a.authorId||"",category:a.category||a.categoryId||"",categories:a.categories||a.category||a.categoryId||"",categoryId:a.category||a.categoryId||"",...a}}catch(t){console.error("\u26A0\uFE0F Failed to parse frontmatter:",t)}}organizeFieldsByTabs(){let e=new Set;Object.values(this.tabs).forEach(t=>{t.fields&&t.fields.forEach(a=>e.add(a))}),this.tabs.advanced.fields=this.formFields.filter(t=>!e.has(t.name)).map(t=>t.name)}render(){let{contentEl:e}=this;e.empty(),this.renderHeader(e);let t=e.createDiv("tabbed-main-content");this.renderTabNavigation(t),this.renderTabContent(t),this.renderFooter(e)}renderHeader(e){let t=e.createDiv("tabbed-upload-header");t.innerHTML=`
 			<div class="tabbed-header-content">
 				<div class="header-left">
 					<svg class="craft-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1070,9 +1070,9 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 		`;let r=t.createDiv("footer-right");r.createEl("button",{text:"\u{1F680} Smart Upload",cls:"footer-upload-btn"}).addEventListener("click",async()=>{await this.handleUpload()}),r.createEl("button",{text:"Cancel",cls:"footer-cancel-btn"}).addEventListener("click",()=>this.close())}async handleUpload(){var e;if(!this.selectedContentType||!this.currentFile){new g.Notice("Missing required data for upload");return}try{new g.Notice("\u{1F680} Starting smart upload...");let t={title:this.formData.title||"",body:this.formData.body||"",deck:this.formData.deck,shortDeck:this.formData.shortDeck,slug:this.formData.slug,metaHeadline:this.formData.metaHeadline,metaDescription:this.formData.metaDescription,tags:this.formData.tags?this.formData.tags.split(",").map(a=>a.trim()):[],enabled:this.asDraft?!1:(e=this.formData.enabled)!=null?e:!0,postDate:this.formData.postDate||new Date().toISOString(),...Object.fromEntries(Object.entries(this.formData).filter(([a])=>!["title","body","deck","shortDeck","slug","metaHeadline","metaDescription","tags","enabled","postDate"].includes(a)))};console.log("\u{1F4E4} Smart upload data with dropdowns:",t),await this.plugin.uploadPost(this.currentFile,{asDraft:this.asDraft}),new g.Notice(`\u2705 Successfully uploaded as ${this.selectedContentType.name}!`),this.close()}catch(t){console.error("\u{1F4A5} Smart upload failed:",t),new g.Notice(`Upload failed: ${t.message}`)}}addModalStyles(){if(!document.querySelector("#tabbed-upload-modal-css")){let e=document.createElement("style");e.id="tabbed-upload-modal-css",e.textContent=`
 				/* Modal sizing */
 				.modal.mod-tabbed-upload {
-					max-width: 1000px !important;
-					width: 1000px !important;
-					min-height: 700px !important;
+					max-width: 1200px !important;
+					width: 1200px !important;
+					min-height: 800px !important;
 				}
 
 				.modal.mod-tabbed-upload .modal-content {
@@ -1101,22 +1101,27 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				}
 
 				.header-left h2 {
-					margin: 0 0 4px 0;
-					font-size: 1.5rem;
+					margin: 0 0 2px 0;
+					font-size: 1.1rem;
 				}
 
 				.header-left p {
 					margin: 0;
 					opacity: 0.9;
+					font-size: 0.8rem;
+					font-weight: 400;
 				}
 
 				.content-type-select {
 					background: rgba(255, 255, 255, 0.2);
 					border: 1px solid rgba(255, 255, 255, 0.3);
 					color: white;
-					padding: 8px 12px;
-					border-radius: 6px;
-					font-size: 0.9rem;
+					padding: 4px 8px;
+					border-radius: 4px;
+					font-size: 0.8rem;
+					min-width: 200px;
+					max-width: 280px;
+					font-weight: 400;
 				}
 
 				.content-type-select option {
@@ -1127,7 +1132,7 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				/* Main content */
 				.tabbed-main-content {
 					display: flex;
-					height: 600px;
+					height: 700px;
 				}
 
 				/* Tab navigation */
@@ -1140,13 +1145,15 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				}
 
 				.tab-button {
-					padding: 12px 20px;
+					padding: 8px 12px;
 					cursor: pointer;
 					display: flex;
 					align-items: center;
-					gap: 12px;
+					gap: 8px;
 					transition: all 0.2s ease;
 					border-left: 3px solid transparent;
+					font-size: 0.8rem;
+					font-weight: 400;
 				}
 
 				.tab-button:hover {
@@ -1154,27 +1161,32 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				}
 
 				.tab-button.active {
-					background: var(--interactive-accent-hover);
+					background: var(--background-modifier-hover);
 					border-left-color: var(--interactive-accent);
 					color: var(--interactive-accent);
 				}
 
 				.tab-icon {
-					font-size: 1.1rem;
+					font-size: 1rem;
+					flex-shrink: 0;
 				}
 
 				.tab-name {
 					font-weight: 500;
 					flex: 1;
+					font-size: 0.8rem;
 				}
 
 				.tab-count {
-					background: var(--background-modifier-border);
-					padding: 2px 6px;
-					border-radius: 10px;
+					background: var(--text-muted);
+					color: var(--background-primary);
+					padding: 1px 4px;
+					border-radius: 6px;
 					font-size: 0.75rem;
-					min-width: 20px;
+					font-weight: 600;
+					min-width: 16px;
 					text-align: center;
+					flex-shrink: 0;
 				}
 
 				.tab-button.active .tab-count {
@@ -1246,7 +1258,7 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				.field-name {
 					font-weight: 600;
 					color: var(--text-normal);
-					font-size: 0.9rem;
+					font-size: 0.8rem;
 				}
 
 				.required-indicator {
@@ -1256,18 +1268,20 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				}
 
 				.field-description {
-					font-size: 0.8rem;
+					font-size: 0.75rem;
 					color: var(--text-muted);
 					margin-top: 2px;
 					line-height: 1.3;
+					font-weight: 400;
 				}
 
 				.field-input {
 					width: 100%;
-					padding: 10px 12px;
+					padding: 8px 10px;
 					border: 2px solid var(--background-modifier-border);
-					border-radius: 6px;
-					font-size: 13px;
+					border-radius: 4px;
+					font-size: 0.8rem;
+					font-weight: 400;
 					background: var(--background-primary);
 					color: var(--text-normal);
 					transition: all 0.2s ease;
@@ -1289,15 +1303,20 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				.checkbox-container {
 					display: flex;
 					align-items: center;
-					gap: 8px;
+					gap: 12px;
+					min-height: 44px;
 				}
 
 				.field-checkbox {
 					width: auto !important;
+					min-height: auto !important;
+					margin: 0;
+					transform: scale(1.2);
 				}
 
 				.checkbox-label {
 					font-weight: 500;
+					line-height: 1.4;
 				}
 
 				/* Upload options */
@@ -1339,27 +1358,30 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 					display: flex;
 					align-items: center;
 					gap: 6px;
-					margin-bottom: 2px;
+					margin-bottom: 4px;
 				}
 
 				.option-title,
 				.status-title {
-					font-weight: 500;
-					font-size: 0.85rem;
+					font-weight: 600;
+					font-size: 0.8rem;
 				}
 
 				.option-description,
 				.status-description {
-					font-size: 0.8rem;
+					font-size: 0.75rem;
+					font-weight: 400;
 					color: var(--text-muted);
 					line-height: 1.3;
+					margin-right: 24px; /* Space for checkbox */
 				}
 
 				.option-checkbox {
 					position: absolute;
-					top: 12px;
-					right: 12px;
-					transform: scale(0.9);
+					top: 10px;
+					right: 10px;
+					transform: scale(0.8);
+					z-index: 10;
 				}
 
 				.status-card.status-success {
@@ -1393,7 +1415,8 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 				}
 
 				.footer-info {
-					font-size: 0.85rem;
+					font-size: 0.8rem;
+					font-weight: 400;
 					color: var(--text-muted);
 				}
 
@@ -1696,4 +1719,4 @@ ${l}`}function k(l){return l.toLowerCase().replace(/[^\w\s-]/g,"").replace(/[\s_
 					<polyline points="21,15 16,10 5,21"/>
 				</svg>
 				<p>No image selected</p>
-			`}async handleUpload(){if(this.filename=K(this.filename),!this.filename){new w.Notice("Please enter a filename");return}if(!this.selectedFile&&!this.imageUrl){new w.Notice("Please select a file or enter a URL");return}try{new w.Notice("Uploading image...");let e;this.selectedFile?(console.log("\u{1F4C1} Using local file:",this.selectedFile.name),e=await this.imageManager.uploadFromFile(this.selectedFile)):(console.log("\u{1F310} Using URL:",this.imageUrl),e=await this.imageManager.uploadFromUrl(this.imageUrl,this.filename));let t=this.imageManager.generateAssetCode(e.id);this.editor.replaceSelection(t),new w.Notice(`\u2705 Image uploaded! Asset ID: ${e.id}`),console.log("\u{1F389} Asset code inserted:",t),this.close()}catch(e){console.error("\u{1F4A5} Upload failed:",e),new w.Notice(`Upload failed: ${e.message}`)}}onClose(){let{contentEl:e}=this;e.empty()}};j();_();var N=class extends p.Plugin{async onload(){console.log("\u{1F680} Craft CMS Plugin: Starting to load..."),await this.loadSettings(),this.api=new T(this.settings),this.schemaManager=new b(this.api),this.addRibbonIcon("upload","Upload to Craft CMS",t=>{this.uploadCurrentPost()}).addClass("craft-cms-ribbon-class"),this.registerCommands(),this.addSettingTab(new U(this.app,this)),console.log("\u2705 Craft CMS Plugin: Fully loaded!")}registerCommands(){this.addCommand({id:"upload-current-post",name:"Upload current post to Craft CMS",editorCallback:(e,t)=>{this.uploadCurrentPost()}}),this.addCommand({id:"upload-post-dialog",name:"Upload post to Craft CMS (with options)",callback:()=>{new H(this.app,this).open()}}),this.addCommand({id:"upload-post-force-new",name:"Upload as NEW post (ignore existing ID)",editorCallback:(e,t)=>{this.uploadCurrentPost({forceNew:!0})}}),this.addCommand({id:"open-craft-url",name:"Open post in Craft CMS",editorCallback:(e,t)=>{this.openInCraft()}}),this.addCommand({id:"upload-image",name:"Upload image to Craft CMS",editorCallback:(e,t)=>{new B(this.app,this,e).open()}}),this.addCommand({id:"test-craft-connection",name:"Test Craft CMS connection",callback:()=>{this.testConnection()}}),this.addCommand({id:"analyze-craft-schema",name:"Analyze Craft CMS Schema",callback:()=>{new E(this.app,this).open()}}),this.addCommand({id:"smart-upload-with-schema",name:"Smart Upload (Schema-based)",callback:()=>{this.smartUpload()}}),this.addCommand({id:"dynamic-upload",name:"Dynamic Upload (Smart Form)",callback:()=>{new I(this.app,this).open()}}),this.addCommand({id:"tabbed-upload",name:"Tabbed Upload (Smart Form)",callback:()=>{new O(this.app,this).open()}})}async openInCraft(){let e=this.app.workspace.getActiveViewOfType(p.MarkdownView);if(!(e!=null&&e.file)){new p.Notice("No active file found");return}let t=await this.app.vault.read(e.file),{frontmatter:a}=C(t);if(a.craftPostId){let r=this.settings.baseUrl||W(this.settings.endpoint),o=a.slug||"post",i=`${r}/admin/entries/posts/${a.craftPostId}-${o}?site=default`;console.log("\u{1F517} Opening Craft CMS edit URL:",i),window.open(i,"_blank")}else a.craftUrl?(console.log("\u{1F517} Opening public URL:",a.craftUrl),window.open(a.craftUrl,"_blank")):new p.Notice("No Craft CMS URL found in frontmatter")}async testConnection(){if(!this.settings.token){new p.Notice("Please configure your API token first");return}try{new p.Notice("Testing connection..."),await this.api.testConnection()?new p.Notice("\u2705 Connection successful!"):new p.Notice("\u274C Connection failed")}catch(e){console.error("Connection test error:",e),new p.Notice(`Connection test failed: ${e.message}`)}}async uploadCurrentPost(e){let t=this.app.workspace.getActiveViewOfType(p.MarkdownView);if(!t){new p.Notice("No active markdown file found");return}let a=t.file;if(!a){new p.Notice("No file selected");return}try{await this.uploadPost(a,e)}catch(r){console.error("Upload failed:",r),new p.Notice(`Upload failed: ${r.message}`)}}async uploadPost(e,t){var u,y,S,M,D;let a=L(this.settings);if(a.length>0){new p.Notice(`Settings validation failed: ${a.join(", ")}`);return}new p.Notice("Starting upload...");let r=await this.app.vault.read(e),{frontmatter:o,body:i}=C(r);console.log("\u{1F4CA} Parsed frontmatter:",o);let s={title:o.title||e.basename,body:i,deck:o.deck,shortDeck:o.shortDeck||o.description,slug:o.slug||k(o.title||e.basename),metaHeadline:o.metaHeadline||o.title,metaDescription:o.metaDescription||o.description,tags:o.tags||[],enabled:t!=null&&t.asDraft?!1:(u=o.enabled)!=null?u:!0,postDate:o.postDate||o.date||new Date().toISOString(),featuredImage:o.featuredImage||o.image,sidebarAdToggle:(y=o.sidebarAdToggle)!=null?y:!0,topBarAdToggle:(S=o.topBarAdToggle)!=null?S:!0,bottomAdToggle:(M=o.bottomAdToggle)!=null?M:!0,optimizeAds:(D=o.optimizeAds)!=null?D:!0};console.log("\u{1F4E4} Final post data:",s);let c=await this.api.findTags(s.tags||[]),d=o.craftPostId,m=d&&!(t!=null&&t.forceNew),h;m?(console.log("\u{1F504} Updating existing post with ID:",d),h=await this.api.updatePost(d,s,c)):(console.log("\u{1F680} Creating new post..."),h=await this.api.createPost(s,c),h!=null&&h.id&&this.settings.autoSavePostId&&await this.saveCraftDataToFrontmatter(e,{craftPostId:h.id,craftUrl:h.url})),console.log("\u2705 Post processed successfully:",h),new p.Notice("\u2705 Post uploaded successfully!")}async saveCraftDataToFrontmatter(e,t){let a=await this.app.vault.read(e),r=X(a,t);await this.app.vault.modify(e,r)}async loadSettings(){this.settings=Object.assign({},Q,await this.loadData()),this.api&&(this.api=new T(this.settings),this.schemaManager=new b(this.api))}async saveSettings(){await this.saveData(this.settings),this.api=new T(this.settings),this.schemaManager=new b(this.api)}async smartUpload(){let e=this.app.workspace.getActiveViewOfType(p.MarkdownView);if(!(e!=null&&e.file)){new p.Notice("No active file found");return}try{new p.Notice("\u{1F9E0} Analyzing content for smart upload...");let t=await this.schemaManager.getContentTypesForSection(this.settings.sectionHandle);if(t.length===0){new p.Notice("No content types found for this section. Using standard upload."),await this.uploadCurrentPost();return}let a=t[0],r=await this.schemaManager.validateContentTypeForUpload(a.handle);if(!r.valid){new p.Notice(`Content type validation failed: ${r.errors.join(", ")}`);return}r.warnings&&r.warnings.length>0&&console.warn("\u26A0\uFE0F Upload warnings:",r.warnings);let o=await this.schemaManager.getFormFields(a.handle);console.log("\u{1F4CB} Available fields for smart upload:",o),new p.Notice(`\u2705 Smart upload ready! Using ${a.name} with ${o.length} fields`),await this.uploadCurrentPost()}catch(t){console.error("\u{1F4A5} Smart upload failed:",t),new p.Notice(`Smart upload failed: ${t.message}. Using standard upload.`),await this.uploadCurrentPost()}}};
+			`}async handleUpload(){if(this.filename=K(this.filename),!this.filename){new w.Notice("Please enter a filename");return}if(!this.selectedFile&&!this.imageUrl){new w.Notice("Please select a file or enter a URL");return}try{new w.Notice("Uploading image...");let e;this.selectedFile?(console.log("\u{1F4C1} Using local file:",this.selectedFile.name),e=await this.imageManager.uploadFromFile(this.selectedFile)):(console.log("\u{1F310} Using URL:",this.imageUrl),e=await this.imageManager.uploadFromUrl(this.imageUrl,this.filename));let t=this.imageManager.generateAssetCode(e.id);this.editor.replaceSelection(t),new w.Notice(`\u2705 Image uploaded! Asset ID: ${e.id}`),console.log("\u{1F389} Asset code inserted:",t),this.close()}catch(e){console.error("\u{1F4A5} Upload failed:",e),new w.Notice(`Upload failed: ${e.message}`)}}onClose(){let{contentEl:e}=this;e.empty()}};j();_();var N=class extends p.Plugin{async onload(){console.log("\u{1F680} Craft CMS Plugin: Starting to load..."),await this.loadSettings(),this.api=new k(this.settings),this.schemaManager=new b(this.api),this.addRibbonIcon("upload","Upload to Craft CMS",t=>{this.uploadCurrentPost()}).addClass("craft-cms-ribbon-class"),this.registerCommands(),this.addSettingTab(new U(this.app,this)),console.log("\u2705 Craft CMS Plugin: Fully loaded!")}registerCommands(){this.addCommand({id:"upload-current-post",name:"Upload current post to Craft CMS",editorCallback:(e,t)=>{this.uploadCurrentPost()}}),this.addCommand({id:"upload-post-dialog",name:"Upload post to Craft CMS (with options)",callback:()=>{new H(this.app,this).open()}}),this.addCommand({id:"upload-post-force-new",name:"Upload as NEW post (ignore existing ID)",editorCallback:(e,t)=>{this.uploadCurrentPost({forceNew:!0})}}),this.addCommand({id:"open-craft-url",name:"Open post in Craft CMS",editorCallback:(e,t)=>{this.openInCraft()}}),this.addCommand({id:"upload-image",name:"Upload image to Craft CMS",editorCallback:(e,t)=>{new B(this.app,this,e).open()}}),this.addCommand({id:"test-craft-connection",name:"Test Craft CMS connection",callback:()=>{this.testConnection()}}),this.addCommand({id:"analyze-craft-schema",name:"Analyze Craft CMS Schema",callback:()=>{new E(this.app,this).open()}}),this.addCommand({id:"smart-upload-with-schema",name:"Smart Upload (Schema-based)",callback:()=>{this.smartUpload()}}),this.addCommand({id:"dynamic-upload",name:"Dynamic Upload (Smart Form)",callback:()=>{new I(this.app,this).open()}}),this.addCommand({id:"tabbed-upload",name:"Tabbed Upload (Smart Form)",callback:()=>{new O(this.app,this).open()}})}async openInCraft(){let e=this.app.workspace.getActiveViewOfType(p.MarkdownView);if(!(e!=null&&e.file)){new p.Notice("No active file found");return}let t=await this.app.vault.read(e.file),{frontmatter:a}=C(t);if(a.craftPostId){let r=this.settings.baseUrl||W(this.settings.endpoint),o=a.slug||"post",i=`${r}/admin/entries/posts/${a.craftPostId}-${o}?site=default`;console.log("\u{1F517} Opening Craft CMS edit URL:",i),window.open(i,"_blank")}else a.craftUrl?(console.log("\u{1F517} Opening public URL:",a.craftUrl),window.open(a.craftUrl,"_blank")):new p.Notice("No Craft CMS URL found in frontmatter")}async testConnection(){if(!this.settings.token){new p.Notice("Please configure your API token first");return}try{new p.Notice("Testing connection..."),await this.api.testConnection()?new p.Notice("\u2705 Connection successful!"):new p.Notice("\u274C Connection failed")}catch(e){console.error("Connection test error:",e),new p.Notice(`Connection test failed: ${e.message}`)}}async uploadCurrentPost(e){let t=this.app.workspace.getActiveViewOfType(p.MarkdownView);if(!t){new p.Notice("No active markdown file found");return}let a=t.file;if(!a){new p.Notice("No file selected");return}try{await this.uploadPost(a,e)}catch(r){console.error("Upload failed:",r),new p.Notice(`Upload failed: ${r.message}`)}}async uploadPost(e,t){var u,y,S,M,D;let a=L(this.settings);if(a.length>0){new p.Notice(`Settings validation failed: ${a.join(", ")}`);return}new p.Notice("Starting upload...");let r=await this.app.vault.read(e),{frontmatter:o,body:i}=C(r);console.log("\u{1F4CA} Parsed frontmatter:",o);let s={title:o.title||e.basename,body:i,deck:o.deck,shortDeck:o.shortDeck||o.description,slug:o.slug||T(o.title||e.basename),metaHeadline:o.metaHeadline||o.title,metaDescription:o.metaDescription||o.description,tags:o.tags||[],enabled:t!=null&&t.asDraft?!1:(u=o.enabled)!=null?u:!0,postDate:o.postDate||o.date||new Date().toISOString(),featuredImage:o.featuredImage||o.image,sidebarAdToggle:(y=o.sidebarAdToggle)!=null?y:!0,topBarAdToggle:(S=o.topBarAdToggle)!=null?S:!0,bottomAdToggle:(M=o.bottomAdToggle)!=null?M:!0,optimizeAds:(D=o.optimizeAds)!=null?D:!0};console.log("\u{1F4E4} Final post data:",s);let c=await this.api.findTags(s.tags||[]),d=o.craftPostId,m=d&&!(t!=null&&t.forceNew),h;m?(console.log("\u{1F504} Updating existing post with ID:",d),h=await this.api.updatePost(d,s,c)):(console.log("\u{1F680} Creating new post..."),h=await this.api.createPost(s,c),h!=null&&h.id&&this.settings.autoSavePostId&&await this.saveCraftDataToFrontmatter(e,{craftPostId:h.id,craftUrl:h.url})),console.log("\u2705 Post processed successfully:",h),new p.Notice("\u2705 Post uploaded successfully!")}async saveCraftDataToFrontmatter(e,t){let a=await this.app.vault.read(e),r=X(a,t);await this.app.vault.modify(e,r)}async loadSettings(){this.settings=Object.assign({},Q,await this.loadData()),this.api&&(this.api=new k(this.settings),this.schemaManager=new b(this.api))}async saveSettings(){await this.saveData(this.settings),this.api=new k(this.settings),this.schemaManager=new b(this.api)}async smartUpload(){let e=this.app.workspace.getActiveViewOfType(p.MarkdownView);if(!(e!=null&&e.file)){new p.Notice("No active file found");return}try{new p.Notice("\u{1F9E0} Analyzing content for smart upload...");let t=await this.schemaManager.getContentTypesForSection(this.settings.sectionHandle);if(t.length===0){new p.Notice("No content types found for this section. Using standard upload."),await this.uploadCurrentPost();return}let a=t[0],r=await this.schemaManager.validateContentTypeForUpload(a.handle);if(!r.valid){new p.Notice(`Content type validation failed: ${r.errors.join(", ")}`);return}r.warnings&&r.warnings.length>0&&console.warn("\u26A0\uFE0F Upload warnings:",r.warnings);let o=await this.schemaManager.getFormFields(a.handle);console.log("\u{1F4CB} Available fields for smart upload:",o),new p.Notice(`\u2705 Smart upload ready! Using ${a.name} with ${o.length} fields`),await this.uploadCurrentPost()}catch(t){console.error("\u{1F4A5} Smart upload failed:",t),new p.Notice(`Smart upload failed: ${t.message}. Using standard upload.`),await this.uploadCurrentPost()}}};
