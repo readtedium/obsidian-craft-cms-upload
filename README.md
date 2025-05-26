@@ -2,9 +2,9 @@
 
 An attempt to leverage Craft CMS’ powerful GraphQL integrations in a clever way—by effectively turning Obsidian into a front-end for your Craft site. Write in Obsidian, publish to Craft CMS, and manage your entire editorial pipeline without leaving your favorite editor. (Pretty wild, huh?)
 
-This is tested on version 4.x but will likely work on version 5.x. The current design is built around the schema for Tedium.co, which is Markdown-centric, but the hope is to make it CMS-agnostic long-term.
+This is tested on version 4.x but will likely work on version 5.x. The current design is built around the schema for [Tedium: The Dull Side of the Internet](https://tedium.co/), which is Markdown-centric, but the hope is to make it site-agnostic long-term.
 
-This was built as part of an experiment in vibe coding by Tedium editor Ernie Smith. [He explains his thinking in this post](https://tedium.co/2025/05/25/ai-bionic-arm-vibe-coding-thoughts/). If you’re not into that kind of thing, 100% fine—but he thought it might be useful to show how to use a tool like Claude in a way that can enable more flexible editorial creation processes.
+This was built as part of an experiment in vibe coding by Tedium editor [Ernie Smith](https://erniesmith.net). [He explains his thinking in this post](https://tedium.co/2025/05/25/ai-bionic-arm-vibe-coding-thoughts/). If you're not into that kind of thing, 100% fine—but he thought it might be useful to show how to use a tool like Claude in a way that can enable more flexible editorial creation processes.
 
 > **⚠️ Active Development Notice**: This plugin is under heavy development with frequent changes expected. Features and APIs may change without notice as we refine the experience.
 
@@ -75,17 +75,54 @@ The plugin automatically:
 
 1. Download the plugin files to your vault's `.obsidian/plugins/` directory
 2. Enable the plugin in Obsidian settings
-3. Configure your Craft CMS connection in the plugin settings
+3. Set up GraphQL API access in Craft CMS (see below)
+4. Configure your Craft CMS connection in the plugin settings
+
+### Setting Up GraphQL API Access
+
+This is the trickiest part, but essential for the plugin to work. In your Craft CMS admin:
+
+#### 1. Enable GraphQL API
+- Go to **Settings → GraphQL**
+- Create a new schema (or use the default "Public Schema")
+- Enable the sections, entry types, and field types you want to access
+- **Important**: Enable Users, Assets, Tags, and Categories schemas
+
+#### 2. Create an API Token
+- Go to **Settings → GraphQL → Tokens**
+- Click **New Token**
+- Give it a descriptive name (e.g., "Obsidian Plugin")
+- Select your schema
+- Set permissions:
+  - **Queries**: Enable all content you want to read
+  - **Mutations**: Enable content creation/editing permissions
+  - **Schema introspection**: Enable (required for dynamic forms)
+
+#### 3. Find Your GraphQL Endpoint
+Your GraphQL endpoint will typically be:
+```
+https://yoursite.com/index.php?action=graphql/api
+```
+
+Or if you have pretty URLs enabled:
+```
+https://yoursite.com/api
+```
+
+Test your endpoint by visiting it in a browser - you should see the GraphQL Playground interface.
 
 ### Configuration
 
-Navigate to **Settings → Craft CMS** and configure:
+Navigate to **Settings → Craft CMS Upload** in Obsidian and configure:
 
-- **GraphQL Endpoint**: Your Craft CMS GraphQL API URL
-- **API Token**: Token with sufficient permissions for content creation
+- **GraphQL Endpoint**: Your Craft CMS GraphQL API URL (see above)
+- **API Token**: The token you created in Craft CMS
 - **Section Handle**: Default section for posts (e.g., "posts")
-- **Author ID**: Your default author ID
+- **Author ID**: Your default author ID (find this in Craft CMS → Users)
 - **Base URL**: Your site's base URL for admin links
+
+#### Finding Your Author ID
+In Craft CMS, go to **Users**, click on your user account, and look at the URL. The number at the end is your Author ID (e.g., `/admin/users/1` means your Author ID is `1`).
 
 ## Usage
 
@@ -234,12 +271,14 @@ src/
 ### Common Issues
 
 **Connection Failed**
-- Verify your GraphQL endpoint URL
-- Check API token permissions
+- Verify your GraphQL endpoint URL (try visiting it in a browser)
+- Check API token permissions and ensure it's copied correctly
 - Ensure GraphQL API is enabled in Craft CMS
+- Verify your schema includes the sections you're trying to access
 
 **Schema Not Loading**
-- Verify token has schema introspection permissions
+- Verify token has schema introspection permissions in Craft CMS
+- Ensure Users, Assets, Tags, and Categories are enabled in your GraphQL schema
 - Check for GraphQL endpoint accessibility
 - Review browser console for detailed errors
 
