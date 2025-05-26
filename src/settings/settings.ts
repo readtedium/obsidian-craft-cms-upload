@@ -1,12 +1,12 @@
 import { CraftCMSSettings } from '../api/types';
 
 export const DEFAULT_SETTINGS: CraftCMSSettings = {
-	endpoint: 'https://old.tedium.co/index.php?action=graphql/api',
+	endpoint: 'https://your-site.com/index.php?action=graphql/api',
 	token: '',
 	sectionHandle: 'posts',
 	authorId: '1',
 	autoSavePostId: true,
-	baseUrl: 'https://old.tedium.co'
+	baseUrl: 'https://your-site.com'
 };
 
 export function validateSettings(settings: CraftCMSSettings): string[] {
