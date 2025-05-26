@@ -1,94 +1,275 @@
-# Obsidian Sample Plugin
+# Obsidian Craft CMS Plugin
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An attempt to leverage Craft CMS’ powerful GraphQL integrations in a clever way—by effectively turning Obsidian into a front-end for your Craft site. Write in Obsidian, publish to Craft CMS, and manage your entire editorial pipeline without leaving your favorite editor. (Pretty wild, huh?)
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+This is tested on version 4.x but will likely work on version 5.x. The current design is built around the schema for Tedium.co, which is Markdown-centric, but the hope is to make it CMS-agnostic long-term.
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+This was built as part of an experiment in vibe coding by Tedium editor Ernie Smith. [He explains his thinking in this post](https://tedium.co/2025/05/25/ai-bionic-arm-vibe-coding-thoughts/). If you’re not into that kind of thing, 100% fine—but he thought it might be useful to show how to use a tool like Claude in a way that can enable more flexible editorial creation processes.
 
-## First time developing plugins?
+> **⚠️ Active Development Notice**: This plugin is under heavy development with frequent changes expected. Features and APIs may change without notice as we refine the experience.
 
-Quick starting guide for new plugin devs:
+## Current Status
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+### ✅ What Works Now
 
-## Releasing new releases
+- **Article Publishing**: Upload markdown posts with full frontmatter support
+- **Image Management**: Upload images directly from Obsidian with drag-and-drop support
+- **Smart Forms**: Dynamic upload forms that adapt to your Craft CMS content types
+- **Schema Introspection**: Automatically discover your Craft CMS structure (sections, fields, content types)
+- **Tag Support**: Automatic tag discovery and assignment
+- **Draft Mode**: Save posts as drafts before publishing
+- **Frontmatter Integration**: Seamlessly sync metadata between Obsidian and Craft CMS
+- **Connection Testing**: Built-in tools to validate your API setup
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+### 🔄 In Development
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+- **Author & Category Management**: Enhanced handling of taxonomies
+- **Batch Operations**: Upload multiple posts at once
+- **Content Pulling**: Import existing Craft CMS content for editing in Obsidian
+- **Advanced Field Mapping**: Smarter handling of custom field types
 
-## Adding your plugin to the community plugin list
+## Features
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+### Dynamic Schema Analysis
 
-## How to use
+The plugin intelligently analyzes your Craft CMS GraphQL schema to:
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+- Discover all available content types and sections
+- Map custom fields to appropriate form inputs
+- Validate content before upload
+- Generate context-aware upload forms
 
-## Manually installing the plugin
+### Professional Upload Interface
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+Choose from multiple upload experiences:
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
+- **Quick Upload**: Fast upload with minimal options
+- **Smart Upload**: Schema-aware form with field validation
+- **Tabbed Interface**: Professional multi-tab form organized by field categories (Article, Meta, Social, Taxonomy, Media, Advanced)
 
-## Funding URL
+### Intelligent Content Mapping
 
-You can include funding URLs where people who use your plugin can financially support it.
+The plugin automatically:
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+- Maps frontmatter fields to Craft CMS fields
+- Handles complex field types (assets, relations, taxonomies)
+- Preserves existing content when updating
+- Maintains clean, canonical metadata
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+### Image Management
+
+- Upload images via drag-and-drop or URL
+- Automatic filename sanitization
+- Asset picker interface
+- Generate Craft CMS asset codes for embedding
+
+## Setup
+
+### Prerequisites
+
+- Obsidian installed
+- Craft CMS site with GraphQL API enabled
+- API token with appropriate permissions
+
+### Installation
+
+1. Download the plugin files to your vault's `.obsidian/plugins/` directory
+2. Enable the plugin in Obsidian settings
+3. Configure your Craft CMS connection in the plugin settings
+
+### Configuration
+
+Navigate to **Settings → Craft CMS** and configure:
+
+- **GraphQL Endpoint**: Your Craft CMS GraphQL API URL
+- **API Token**: Token with sufficient permissions for content creation
+- **Section Handle**: Default section for posts (e.g., "posts")
+- **Author ID**: Your default author ID
+- **Base URL**: Your site's base URL for admin links
+
+## Usage
+
+### Basic Article Upload
+
+1. Write your article in Obsidian with frontmatter:
+
+```yaml
+---
+title: "My Great Article"
+deck: "A compelling subtitle"
+tags: ["technology", "innovation"]
+slug: "my-great-article"
+---
+
+Your article content here...
 ```
 
-If you have multiple URLs, you can also do:
+2. Use **Cmd/Ctrl + P** → "Upload current post to Craft CMS"
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+### Smart Upload with Dynamic Forms
+
+1. Use **Cmd/Ctrl + P** → "Tabbed Upload (Smart Form)"
+2. Select your content type from the dropdown
+3. Fill out the dynamically generated form organized in professional tabs
+4. Upload or save as draft
+
+### Image Upload
+
+1. Use **Cmd/Ctrl + P** → "Upload image to Craft CMS"
+2. Choose a local file or paste a URL
+3. The plugin generates a Craft CMS asset code you can paste into your articles
+
+### Schema Analysis
+
+Use **Cmd/Ctrl + P** → "Analyze Craft CMS Schema" to:
+
+- Discover all your content types and fields
+- View field counts and organization
+- Debug schema-related issues
+
+## Technical Architecture
+
+### Key Components
+
+- **Schema Introspector**: Analyzes Craft CMS GraphQL schema
+- **Dynamic Form Generator**: Creates context-aware upload forms  
+- **Field Mapper**: Intelligently maps Obsidian frontmatter to Craft fields
+- **Image Manager**: Handles asset uploads and management
+- **API Client**: Robust GraphQL client with error handling
+
+### Smart Field Mapping
+
+The plugin includes intelligent field mapping for common scenarios:
+
+```typescript
+// Example automatic mappings
+'featuredImage' → 'image' (asset field)
+'postAuthor' → author lookup by name
+'tags' → automatic tag discovery/creation
+'enabled' → publish status handling
 ```
 
-## API Documentation
+### Schema-Driven Interface
 
-See https://github.com/obsidianmd/obsidian-api
+The plugin dynamically generates forms based on your Craft CMS schema:
+
+- **Essential Fields**: title, body, slug (always shown first)
+- **Content Fields**: deck, shortDeck, meta fields
+- **Advanced Fields**: All remaining custom fields (collapsible)
+- **Validation**: Real-time field validation against schema
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `Upload current post to Craft CMS` | Quick upload of active document |
+| `Upload post to Craft CMS (with options)` | Upload with draft/options dialog |
+| `Upload as NEW post (ignore existing ID)` | Force create new post |
+| `Smart Upload (Schema-based)` | Schema-aware upload with validation |
+| `Dynamic Upload (Smart Form)` | Adaptive form based on content type |
+| `Tabbed Upload (Smart Form)` | Professional tabbed interface |
+| `Upload image to Craft CMS` | Image upload with asset code generation |
+| `Open post in Craft CMS` | Open current post in Craft admin |
+| `Test Craft CMS connection` | Validate API configuration |
+| `Analyze Craft CMS Schema` | Explore your CMS structure |
+
+## Frontmatter Support
+
+The plugin supports comprehensive frontmatter integration:
+
+```yaml
+---
+# Core Content
+title: "Article Title"
+deck: "Article subtitle"
+body: "Article content" # Auto-populated
+slug: "url-slug"
+
+# Publishing
+enabled: true
+postDate: "2024-01-15"
+postAuthor: "Author Name"
+
+# SEO & Meta
+metaHeadline: "SEO Title"
+metaDescription: "SEO description"
+
+# Taxonomy
+tags: ["tag1", "tag2"]
+category: "Category Name"
+
+# Media
+image: "12345" # Asset ID
+featuredImage: "67890" # Asset ID
+
+# Craft CMS Integration (auto-generated)
+craftPostId: "123"
+craftUrl: "https://example.com/article"
+---
+```
+
+## Development
+
+### Project Structure
+
+```
+src/
+├── api/           # Craft CMS API integration
+├── content/       # Content processing
+├── settings/      # Plugin configuration
+├── ui/           # User interface components
+└── utils/        # Utility functions
+```
+
+### Key Files
+
+- `main.ts` - Plugin entry point and command registration
+- `src/api/craftAPI.ts` - GraphQL client and API methods
+- `src/api/schemaIntrospector.ts` - Schema analysis and introspection
+- `src/ui/tabbedUploadModal.ts` - Professional tabbed upload interface
+- `src/content/imageManager.ts` - Image upload and asset management
+
+## Troubleshooting
+
+### Common Issues
+
+**Connection Failed**
+- Verify your GraphQL endpoint URL
+- Check API token permissions
+- Ensure GraphQL API is enabled in Craft CMS
+
+**Schema Not Loading**
+- Verify token has schema introspection permissions
+- Check for GraphQL endpoint accessibility
+- Review browser console for detailed errors
+
+**Upload Failures**
+- Validate required fields are present
+- Check content type permissions
+- Ensure section handle is correct
+
+### Debug Mode
+
+Enable debug logging by opening browser console while using the plugin. All operations log detailed information for troubleshooting.
+
+## Roadmap
+
+- **Enhanced Author Management**: Full author lookup and assignment
+- **Category Hierarchies**: Support for nested category structures  
+- **Batch Processing**: Multi-file upload operations
+- **Content Sync**: Two-way sync between Obsidian and Craft CMS
+- **Template System**: Predefined content templates
+- **Preview Mode**: Preview before publish
+- **Workflow Integration**: Editorial workflow support
+
+## Contributing
+
+This plugin is in active development. While we welcome feedback and bug reports, please note that the API and features are subject to frequent changes.
+
+## License
+
+MIT License - See LICENSE file for details
+
+---
+
+*Built for content creators who want the power of Craft CMS with the writing experience of Obsidian. Or giant nerds who think CMS platforms could learn something from dedicated writing tools.*
