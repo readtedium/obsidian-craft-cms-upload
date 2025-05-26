@@ -23,6 +23,19 @@ export interface PostData {
 	topBarAdToggle?: boolean;
 	bottomAdToggle?: boolean;
 	optimizeAds?: boolean;
+	
+	// Add the author field (this is the required user field)
+	author?: string | number;
+	
+	// Keep postAuthor for the custom byline field
+	postAuthor?: string;
+	
+	// Add other common fields that might be used
+	category?: string | number;
+	image?: string | number;
+	
+	// Allow any other dynamic fields
+	[key: string]: any;
 }
 
 export interface CraftPost {

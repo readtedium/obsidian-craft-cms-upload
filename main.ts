@@ -188,7 +188,7 @@ export default class CraftCMSPlugin extends Plugin {
 		}
 	}
 
-	async uploadPost(file: TFile, options?: UploadOptions) {
+async uploadPost(file: TFile, options?: UploadOptions) {
 		// Validate settings
 		const validationErrors = validateSettings(this.settings);
 		if (validationErrors.length > 0) {
@@ -203,8 +203,21 @@ export default class CraftCMSPlugin extends Plugin {
 
 		console.log('📊 Parsed frontmatter:', frontmatter);
 
-		// Prepare post data
-		const postData: PostData = {
+		// Get available content types to determine what fields are supported
+		let supportedFields: string[] = [];
+		try {
+			const contentTypes = await this.schemaManager.getContentTypesForSection(this.settings.sectionHandle);
+			if (contentTypes.length > 0) {
+				const formFields = await this.schemaManager.getFormFields(contentTypes[0].handle);
+				supportedFields = formFields.map(field => field.name);
+				console.log('🔍 Supported fields from schema:', supportedFields);
+			}
+		} catch (error) {
+			console.warn('⚠️ Could not load schema fields, using basic field set:', error);
+		}
+
+		// Prepare core post data with all known fields
+		const corePostData: PostData = {
 			title: frontmatter.title || file.basename,
 			body: body,
 			deck: frontmatter.deck,
@@ -222,7 +235,40 @@ export default class CraftCMSPlugin extends Plugin {
 			optimizeAds: frontmatter.optimizeAds ?? true
 		};
 
-		console.log('📤 Final post data:', postData);
+		// Add dynamic fields from frontmatter that exist in the schema
+		const dynamicFields: Record<string, any> = {};
+		
+		// Core fields that are already handled above
+		const coreFieldNames = [
+			'title', 'body', 'deck', 'shortDeck', 'slug', 'metaHeadline', 'metaDescription',
+			'tags', 'enabled', 'postDate', 'featuredImage', 'image', 'sidebarAdToggle', 
+			'topBarAdToggle', 'bottomAdToggle', 'optimizeAds', 
+			// Skip internal craft fields
+			'craftPostId', 'craftUrl'
+		];
+
+		// Add any frontmatter fields that aren't in the core set
+		Object.entries(frontmatter).forEach(([key, value]) => {
+			if (!coreFieldNames.includes(key) && value !== undefined && value !== '') {
+				// If we have schema info, only include fields that are supported
+				if (supportedFields.length === 0 || supportedFields.includes(key)) {
+					dynamicFields[key] = value;
+					console.log(`✅ Adding dynamic field: ${key} = ${value}`);
+				} else {
+					console.log(`⏭️ Skipping unsupported field: ${key} = ${value}`);
+				}
+			}
+		});
+
+		// Combine core and dynamic data
+		const postData: PostData = {
+			...corePostData,
+			...dynamicFields,
+			// Always set the author field to your ID (required for publishing)
+			author: this.settings.authorId, // This ensures you're always the backend author
+		};
+
+		console.log('📤 Final post data with dynamic fields:', postData);
 
 		// Handle tags
 		const tagIds = await this.api.findTags(postData.tags || []);
@@ -232,10 +278,10 @@ export default class CraftCMSPlugin extends Plugin {
 		let result;
 		if (shouldUpdate) {
 			console.log('🔄 Updating existing post with ID:', existingPostId);
-			result = await this.api.updatePost(existingPostId, postData, tagIds);
+			result = await this.api.updatePost(existingPostId, postData, tagIds, supportedFields);
 		} else {
 			console.log('🚀 Creating new post...');
-			result = await this.api.createPost(postData, tagIds);
+			result = await this.api.createPost(postData, tagIds, supportedFields);
 			
 			// Save post ID and URL to frontmatter if auto-save is enabled
 			if (result?.id && this.settings.autoSavePostId) {
