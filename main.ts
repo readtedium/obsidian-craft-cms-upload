@@ -188,7 +188,7 @@ export default class CraftCMSPlugin extends Plugin {
 		}
 	}
 
-async uploadPost(file: TFile, options?: UploadOptions) {
+	async uploadPost(file: TFile, options?: UploadOptions) {
 		// Validate settings
 		const validationErrors = validateSettings(this.settings);
 		if (validationErrors.length > 0) {
@@ -270,8 +270,11 @@ async uploadPost(file: TFile, options?: UploadOptions) {
 
 		console.log('📤 Final post data with dynamic fields:', postData);
 
-		// Handle tags
-		const tagIds = await this.api.findTags(postData.tags || []);
+		// Handle tags with creation - UPDATED TO USE NEW METHOD
+		console.log('🏷️ Processing tags:', postData.tags);
+		const tagIds = await this.api.findOrCreateTags(postData.tags || []);
+		console.log('🏷️ Final tag IDs:', tagIds);
+		
 		const existingPostId = frontmatter.craftPostId;
 		const shouldUpdate = existingPostId && !options?.forceNew;
 
@@ -293,7 +296,7 @@ async uploadPost(file: TFile, options?: UploadOptions) {
 		}
 
 		console.log('✅ Post processed successfully:', result);
-		new Notice('✅ Post uploaded successfully!');
+		new Notice(`✅ Post uploaded successfully with ${tagIds.length} tags!`);
 	}
 
 	private async saveCraftDataToFrontmatter(file: TFile, craftData: { craftPostId: string; craftUrl: string }) {

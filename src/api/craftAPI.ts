@@ -48,7 +48,7 @@ export class CraftAPI {
 		}
 	}
 
-	async findTags(tagNames: string[]): Promise<number[]> {
+	async findOrCreateTags(tagNames: string[]): Promise<number[]> {
 		if (!tagNames || tagNames.length === 0) {
 			return [];
 		}
@@ -57,26 +57,21 @@ export class CraftAPI {
 
 		for (const tagName of tagNames) {
 			try {
-				const query = `
-					query FindTag($titles: [String]) {
-						tags(title: $titles, limit: 1) {
-							id
-							title
-						}
-					}
-				`;
-
-				const response = await this.makeRequest<{ tags: CraftTag[] }>(
-					query, 
-					{ titles: [tagName] }
-				);
-
-				if (response.data?.tags?.length && response.data.tags.length > 0) {
-					const existingTag = response.data.tags[0];
-					tagIds.push(parseInt(existingTag.id));
-					console.log(`✅ Found existing tag: ${tagName} (ID: ${existingTag.id})`);
+				// First, try to find existing tag
+				const existingTagId = await this.findExistingTag(tagName);
+				
+				if (existingTagId) {
+					tagIds.push(existingTagId);
+					console.log(`✅ Found existing tag: ${tagName} (ID: ${existingTagId})`);
 				} else {
-					console.log(`⏭️ Tag not found: ${tagName}`);
+					// Create new tag if it doesn't exist
+					const newTagId = await this.createTag(tagName);
+					if (newTagId) {
+						tagIds.push(newTagId);
+						console.log(`🆕 Created new tag: ${tagName} (ID: ${newTagId})`);
+					} else {
+						console.warn(`❌ Failed to create tag: ${tagName}`);
+					}
 				}
 			} catch (error) {
 				console.warn(`❌ Error processing tag ${tagName}:`, error);
@@ -84,6 +79,76 @@ export class CraftAPI {
 		}
 
 		return tagIds;
+	}
+
+	private async findExistingTag(tagName: string): Promise<number | null> {
+		try {
+			const query = `
+				query FindTag($titles: [String]) {
+					tags(title: $titles, limit: 1) {
+						id
+						title
+					}
+				}
+			`;
+
+			const response = await this.makeRequest<{ tags: CraftTag[] }>(
+				query, 
+				{ titles: [tagName] }
+			);
+
+			if (response.data?.tags?.length && response.data.tags.length > 0) {
+				const existingTag = response.data.tags[0];
+				return parseInt(existingTag.id);
+			}
+
+			return null;
+		} catch (error) {
+			console.warn(`❌ Error finding tag ${tagName}:`, error);
+			return null;
+		}
+	}
+
+	private async createTag(tagName: string): Promise<number | null> {
+		try {
+			const mutation = `
+				mutation CreateTag($title: String!) {
+					save_tags_Tag(
+						title: $title
+					) {
+						id
+						title
+					}
+				}
+			`;
+
+			console.log(`🏷️ Creating new tag: ${tagName}`);
+
+			const response = await this.makeRequest<{ save_tags_Tag: CraftTag }>(
+				mutation,
+				{ title: tagName }
+			);
+
+			if (response.errors) {
+				console.error('💥 Tag creation errors:', response.errors);
+				return null;
+			}
+
+			if (response.data?.save_tags_Tag?.id) {
+				return parseInt(response.data.save_tags_Tag.id);
+			}
+
+			return null;
+		} catch (error) {
+			console.error(`💥 Failed to create tag ${tagName}:`, error);
+			return null;
+		}
+	}
+
+	// Keep the old method for backward compatibility but mark as deprecated
+	async findTags(tagNames: string[]): Promise<number[]> {
+		console.warn('⚠️ findTags() is deprecated, use findOrCreateTags() instead');
+		return this.findOrCreateTags(tagNames);
 	}
 
 // Cache for author lookups to avoid repeated API calls
@@ -169,11 +234,11 @@ export class CraftAPI {
 		'bottomAdToggle': { craftName: 'bottomAdToggle', graphqlType: 'Boolean' },
 		'optimizeAds': { craftName: 'optimizeAds', graphqlType: 'Boolean' },
 		
-		// Author field - required user field (now that users schema is enabled!)
+		// Author field - USE authorId instead of author
 		'author': { 
-			craftName: 'author',    // Back to 'author' now that users work
-			graphqlType: '[Int]',   // Probably array of user IDs
-			transform: (v) => v ? [parseInt(v)] : null
+			craftName: 'authorId',    // Fixed: Use authorId instead of author
+			graphqlType: 'ID',        // Fixed: Single ID, not array
+			transform: (v) => v ? String(v) : null  // Convert to string for ID type
 		},
 		
 		// PostAuthor field - custom byline author (could be guest authors)
@@ -254,7 +319,7 @@ export class CraftAPI {
 			} else if (field === 'postDate') {
 				dynamicFieldVars.push('$postDate: DateTime');
 				dynamicFieldInputs.push('postDate: $postDate');
-				dynamicFieldInputs.push('postDate: $postDate');
+				// Remove the duplicate postDate line that was causing the error
 			} else {
 				dynamicFieldVars.push(`$${field}: String`);
 				dynamicFieldInputs.push(`${field}: $${field}`);
@@ -282,19 +347,25 @@ export class CraftAPI {
 					
 					// Use the mapped field name and type
 					const varName = mappedField.name;
-					dynamicFieldVars.push(`$${varName}: ${mappedField.type}`);
-					dynamicFieldInputs.push(`${varName}: $${varName}`);
-					mutationVariables[varName] = mappedField.value;
+					const varDeclaration = `$${varName}: ${mappedField.type}`;
+					const inputDeclaration = `${varName}: $${varName}`;
+					
+					// Avoid duplicates
+					if (!dynamicFieldVars.includes(varDeclaration)) {
+						dynamicFieldVars.push(varDeclaration);
+						dynamicFieldInputs.push(inputDeclaration);
+						mutationVariables[varName] = mappedField.value;
+					}
 				}
 			}
 		}
 
 		const mutation = `
 			mutation CreatePost(
-				${dynamicFieldVars.join(',\n\t\t\t\t')}
+				${dynamicFieldVars.join(',\n\t\t\t')}
 			) {
 				save_posts_posts_Entry(
-					${dynamicFieldInputs.join(',\n\t\t\t\t\t')}
+					${dynamicFieldInputs.join(',\n\t\t\t\t')}
 				) {
 					id
 					title
@@ -311,8 +382,8 @@ export class CraftAPI {
 			}
 		`;
 
-		console.log('🚀 Mapped GraphQL Mutation:', mutation);
-		console.log('🚀 Mapped Mutation Variables:', mutationVariables);
+		console.log('🚀 Fixed GraphQL Mutation:', mutation);
+		console.log('🚀 Mutation Variables:', mutationVariables);
 
 		const response = await this.makeRequest<{ save_posts_posts_Entry: CraftPost }>(
 			mutation, 
@@ -331,7 +402,7 @@ export class CraftAPI {
 		return response.data.save_posts_posts_Entry;
 	}
 
-async updatePost(postId: string, postData: PostData, tagIds: number[] = [], supportedFields: string[] = []): Promise<CraftPost> {
+	async updatePost(postId: string, postData: PostData, tagIds: number[] = [], supportedFields: string[] = []): Promise<CraftPost> {
 		const dynamicFieldVars: string[] = [];
 		const dynamicFieldInputs: string[] = [];
 		const mutationVariables: any = {};
@@ -355,7 +426,7 @@ async updatePost(postId: string, postData: PostData, tagIds: number[] = [], supp
 				dynamicFieldInputs.push('enabled: $enabled');
 			} else if (field === 'postDate') {
 				dynamicFieldVars.push('$postDate: DateTime');
-				dynamicFieldInputs.push('postDate: $postDate');  // Make sure this is included!
+				dynamicFieldInputs.push('postDate: $postDate');  // Only include once!
 			} else {
 				dynamicFieldVars.push(`$${field}: String`);
 				dynamicFieldInputs.push(`${field}: $${field}`);
@@ -376,7 +447,6 @@ async updatePost(postId: string, postData: PostData, tagIds: number[] = [], supp
 		mutationVariables.tags = tagIds.length > 0 ? tagIds : undefined;
 
 		console.log('🔍 DEBUG: Core variables set, including postDate:', mutationVariables.postDate);
-		console.log('🔍 DEBUG: Core inputs include postDate:', dynamicFieldInputs.includes('postDate: $postDate'));
 
 		// Process dynamic fields (skip core fields to avoid duplicates)
 		for (const [key, value] of Object.entries(postData)) {
@@ -400,10 +470,10 @@ async updatePost(postId: string, postData: PostData, tagIds: number[] = [], supp
 
 		const mutation = `
 			mutation UpdatePost(
-				${dynamicFieldVars.join(',\n\t\t\t\t')}
+				${dynamicFieldVars.join(',\n\t\t\t')}
 			) {
 				save_posts_posts_Entry(
-					${dynamicFieldInputs.join(',\n\t\t\t\t\t')}
+					${dynamicFieldInputs.join(',\n\t\t\t\t')}
 				) {
 					id
 					title
@@ -421,7 +491,7 @@ async updatePost(postId: string, postData: PostData, tagIds: number[] = [], supp
 			}
 		`;
 
-		console.log('🔄 Clean mutation:', mutation);
+		console.log('🔄 Clean update mutation:', mutation);
 		console.log('🔄 Variables:', mutationVariables);
 
 		const response = await this.makeRequest<{ save_posts_posts_Entry: CraftPost }>(
