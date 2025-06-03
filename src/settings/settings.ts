@@ -6,7 +6,10 @@ export const DEFAULT_SETTINGS: CraftCMSSettings = {
 	sectionHandle: 'posts',
 	authorId: '1',
 	autoSavePostId: true,
-	baseUrl: 'https://your-site.com'
+	baseUrl: 'https://your-site.com',
+	timezone: 'America/New_York',
+	defaultPostTime: '09:00',
+	dateFormat: 'iso'
 };
 
 export function validateSettings(settings: CraftCMSSettings): string[] {

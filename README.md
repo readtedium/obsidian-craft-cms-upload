@@ -1,6 +1,6 @@
 # Obsidian Craft CMS Plugin
 
-An attempt to leverage Craft CMS’ powerful GraphQL integrations in a clever way—by effectively turning Obsidian into a front-end for your Craft site. Write in Obsidian, publish to Craft CMS, and manage your entire editorial pipeline without leaving your favorite editor. (Pretty wild, huh?)
+An attempt to leverage Craft CMS' powerful GraphQL integrations in a clever way—by effectively turning Obsidian into a front-end for your Craft site. Write in Obsidian, publish to Craft CMS, and manage your entire editorial pipeline without leaving your favorite editor. (Pretty wild, huh?)
 
 This is tested on version 4.x but will likely work on version 5.x. The current design is built around the schema for [Tedium: The Dull Side of the Internet](https://tedium.co/), which is Markdown-centric, but the hope is to make it site-agnostic long-term.
 
@@ -20,6 +20,8 @@ This was built as part of an experiment in vibe coding by Tedium editor [Ernie S
 - **Draft Mode**: Save posts as drafts before publishing
 - **Frontmatter Integration**: Seamlessly sync metadata between Obsidian and Craft CMS
 - **Connection Testing**: Built-in tools to validate your API setup
+- **Advanced DateTime Handling**: Timezone-aware scheduling with precise time control
+- **Professional Upload Interface**: Tabbed forms with asset pickers and real-time validation
 
 ### 🔄 In Development
 
@@ -27,6 +29,7 @@ This was built as part of an experiment in vibe coding by Tedium editor [Ernie S
 - **Batch Operations**: Upload multiple posts at once
 - **Content Pulling**: Import existing Craft CMS content for editing in Obsidian
 - **Advanced Field Mapping**: Smarter handling of custom field types
+- **Webhook Integration**: Real-time sync between Obsidian and Craft CMS
 
 ## Features
 
@@ -46,6 +49,16 @@ Choose from multiple upload experiences:
 - **Quick Upload**: Fast upload with minimal options
 - **Smart Upload**: Schema-aware form with field validation
 - **Tabbed Interface**: Professional multi-tab form organized by field categories (Article, Meta, Social, Taxonomy, Media, Advanced)
+
+### Advanced DateTime Management
+
+The plugin provides sophisticated date and time handling:
+
+- **Timezone-Aware Scheduling**: Configure your site's timezone for accurate post timing
+- **Precise Time Control**: Separate date and time inputs with quick-select buttons (9 AM, 12 PM, 3 PM, 6 PM, Now)
+- **Smart Date Processing**: Handles various frontmatter date formats and preserves existing timestamps
+- **Visual Timeline**: Clear timezone indicators and current time display
+- **Default Post Times**: Set your preferred publishing time (perfect for morning newsletters!)
 
 ### Intelligent Content Mapping
 
@@ -120,6 +133,9 @@ Navigate to **Settings → Craft CMS Upload** in Obsidian and configure:
 - **Section Handle**: Default section for posts (e.g., "posts")
 - **Author ID**: Your default author ID (find this in Craft CMS → Users)
 - **Base URL**: Your site's base URL for admin links
+- **Timezone**: Your site's timezone for accurate post scheduling
+- **Default Post Time**: Preferred time for new posts (e.g., "09:00" for 9 AM)
+- **Date Format**: How dates are formatted for Craft CMS (ISO 8601 recommended)
 
 #### Finding Your Author ID
 In Craft CMS, go to **Users**, click on your user account, and look at the URL. The number at the end is your Author ID (e.g., `/admin/users/1` means your Author ID is `1`).
@@ -136,6 +152,7 @@ title: "My Great Article"
 deck: "A compelling subtitle"
 tags: ["technology", "innovation"]
 slug: "my-great-article"
+postDate: "2024-01-15T09:00:00-05:00"
 ---
 
 Your article content here...
@@ -173,6 +190,7 @@ Use **Cmd/Ctrl + P** → "Analyze Craft CMS Schema" to:
 - **Field Mapper**: Intelligently maps Obsidian frontmatter to Craft fields
 - **Image Manager**: Handles asset uploads and management
 - **API Client**: Robust GraphQL client with error handling
+- **DateTime Manager**: Advanced timezone-aware date/time handling
 
 ### Smart Field Mapping
 
@@ -222,9 +240,9 @@ deck: "Article subtitle"
 body: "Article content" # Auto-populated
 slug: "url-slug"
 
-# Publishing
+# Publishing & Timing
 enabled: true
-postDate: "2024-01-15"
+postDate: "2024-01-15T09:00:00-05:00" # Full datetime with timezone
 postAuthor: "Author Name"
 
 # SEO & Meta
@@ -265,6 +283,8 @@ src/
 - `src/api/schemaIntrospector.ts` - Schema analysis and introspection
 - `src/ui/tabbedUploadModal.ts` - Professional tabbed upload interface
 - `src/content/imageManager.ts` - Image upload and asset management
+- `src/utils/dateUtils.ts` - Advanced datetime handling and timezone management
+- `src/settings/settingsTab.ts` - Plugin configuration interface
 
 ## Troubleshooting
 
@@ -287,6 +307,12 @@ src/
 - Check content type permissions
 - Ensure section handle is correct
 
+**DateTime/Timezone Issues**
+- Verify timezone is correctly set in plugin settings
+- Check that postDate follows ISO 8601 format with timezone
+- Ensure your Craft CMS server timezone matches your configuration
+- Use the datetime preview in settings to verify current time display
+
 ### Debug Mode
 
 Enable debug logging by opening browser console while using the plugin. All operations log detailed information for troubleshooting.
@@ -300,6 +326,7 @@ Enable debug logging by opening browser console while using the plugin. All oper
 - **Template System**: Predefined content templates
 - **Preview Mode**: Preview before publish
 - **Workflow Integration**: Editorial workflow support
+- **Webhook Integration**: Real-time bidirectional sync
 
 ## Contributing
 

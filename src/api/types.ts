@@ -1,3 +1,4 @@
+// Add these new fields to your types.ts:
 export interface CraftCMSSettings {
 	endpoint: string;
 	token: string;
@@ -5,6 +6,10 @@ export interface CraftCMSSettings {
 	authorId: string;
 	autoSavePostId: boolean;
 	baseUrl: string;
+	// New datetime fields
+	timezone: string;
+	defaultPostTime: string;
+	dateFormat: 'iso' | 'craft';
 }
 
 export interface PostData {

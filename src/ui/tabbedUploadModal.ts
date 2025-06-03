@@ -4,6 +4,7 @@ import { CraftContentType, FormFieldDefinition } from '../api/schemaIntrospector
 import { PostData } from '../api/types';
 import { parseFrontmatter, updateFrontmatter } from '../utils/frontmatter';
 import { slugify } from '../utils/textUtils';
+import { DateTimeManager, renderDateTimeField } from '../utils/dateUtils';
 
 export class TabbedUploadModal extends Modal {
 	private plugin: CraftCMSPlugin;
@@ -15,6 +16,7 @@ export class TabbedUploadModal extends Modal {
 	private asDraft: boolean = false;
 	private activeTab: string = 'article';
 	private dropdownOptions: Record<string, Array<{value: string, label: string, url?: string, filename?: string, width?: number, height?: number}>> = {};
+	private dateTimeManager: DateTimeManager;
 
 	// Tab configuration matching Craft CMS style
 	private tabs: Record<string, { name: string; icon: string; fields: string[] }> = {
@@ -53,6 +55,13 @@ export class TabbedUploadModal extends Modal {
 	constructor(app: App, plugin: CraftCMSPlugin) {
 		super(app);
 		this.plugin = plugin;
+		
+		// Initialize date/time manager with plugin settings
+		this.dateTimeManager = new DateTimeManager({
+			timezone: plugin.settings.timezone || 'UTC',
+			defaultTime: plugin.settings.defaultPostTime || '09:00',
+			dateFormat: plugin.settings.dateFormat || 'iso'
+		});
 	}
 
 	async onOpen() {
@@ -129,7 +138,7 @@ export class TabbedUploadModal extends Modal {
 			await Promise.all([
 				this.loadAuthors(),
 				this.loadCategories(),
-				this.loadAssets() // Add asset loading
+				this.loadAssets()
 			]);
 			
 			console.log('📋 Loaded dropdown options:', this.dropdownOptions);
@@ -280,7 +289,6 @@ export class TabbedUploadModal extends Modal {
 					height: asset.height
 				}));
 
-				// Set up asset dropdown options for image-related fields
 				this.dropdownOptions.image = assets;
 				this.dropdownOptions.featuredImage = assets;
 				this.dropdownOptions.sidebarAd = assets;
@@ -354,12 +362,17 @@ export class TabbedUploadModal extends Modal {
 		}
 	}
 
-private async prefillFromFrontmatter() {
+	private async prefillFromFrontmatter() {
 		if (!this.currentFile) return;
 
 		try {
 			const content = await this.app.vault.read(this.currentFile);
 			const { frontmatter, body } = parseFrontmatter(content);
+
+			// Enhanced date handling with timezone support
+			const processedPostDate = this.dateTimeManager.processFrontmatterDate(
+				frontmatter.postDate || frontmatter.date
+			);
 
 			// Clean, non-redundant form data
 			this.formData = {
@@ -370,11 +383,11 @@ private async prefillFromFrontmatter() {
 				shortDeck: frontmatter.shortDeck || frontmatter.description || '',
 				metaHeadline: frontmatter.metaHeadline || frontmatter.title || '',
 				metaDescription: frontmatter.metaDescription || frontmatter.description || '',
-				postDate: frontmatter.postDate || frontmatter.date || new Date().toISOString().split('T')[0],
+				postDate: processedPostDate, // Now properly formatted with timezone
 				enabled: frontmatter.enabled ?? true,
 				tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.join(', ') : '',
 				
-				// Use the canonical field names (no duplicates)
+				// Use canonical field names (no duplicates)
 				postAuthor: frontmatter.postAuthor || frontmatter.author || '',
 				category: frontmatter.category || frontmatter.categoryId || '',
 				image: frontmatter.image || frontmatter.featuredImage || '',
@@ -596,7 +609,6 @@ private async prefillFromFrontmatter() {
 	}
 
 	private openAssetModal(field: FormFieldDefinition) {
-		// Create a simple asset selection modal
 		const modal = new Modal(this.app);
 		modal.titleEl.setText(`Select ${field.label}`);
 		
@@ -696,6 +708,22 @@ private async prefillFromFrontmatter() {
 	}
 
 	private renderFormField(container: HTMLElement, field: FormFieldDefinition) {
+		// Special handling for date/time fields
+		if (field.name === 'postDate' || field.type === 'date' || field.name.includes('Date')) {
+			const fieldContainer = container.createDiv('tab-form-field datetime-field');
+			renderDateTimeField(
+				fieldContainer,
+				field,
+				this.formData[field.name] || '',
+				this.dateTimeManager,
+				(value) => {
+					this.formData[field.name] = value;
+					console.log(`📅 Updated ${field.name}:`, value);
+				}
+			);
+			return;
+		}
+
 		const fieldContainer = container.createDiv('tab-form-field');
 		
 		const fieldHeader = fieldContainer.createDiv('field-header');
@@ -929,7 +957,7 @@ private async prefillFromFrontmatter() {
 		cancelBtn.addEventListener('click', () => this.close());
 	}
 
-private async handleMetadataUpdate() {
+	private async handleMetadataUpdate() {
 		if (!this.currentFile) {
 			new Notice('No file selected');
 			return;
@@ -1024,6 +1052,9 @@ private async handleMetadataUpdate() {
 		try {
 			new Notice('🚀 Starting smart upload...');
 
+			// Ensure postDate is properly formatted with timezone
+			const formattedPostDate = this.dateTimeManager.processFrontmatterDate(this.formData.postDate);
+
 			const postData: PostData = {
 				title: this.formData.title || '',
 				body: this.formData.body || '',
@@ -1034,7 +1065,7 @@ private async handleMetadataUpdate() {
 				metaDescription: this.formData.metaDescription,
 				tags: this.formData.tags ? this.formData.tags.split(',').map((t: string) => t.trim()) : [],
 				enabled: this.asDraft ? false : (this.formData.enabled ?? true),
-				postDate: this.formData.postDate || new Date().toISOString(),
+				postDate: formattedPostDate, // Properly formatted datetime with timezone
 				...Object.fromEntries(
 					Object.entries(this.formData).filter(([key]) => 
 						!['title', 'body', 'deck', 'shortDeck', 'slug', 'metaHeadline', 
@@ -1043,7 +1074,7 @@ private async handleMetadataUpdate() {
 				)
 			};
 
-			console.log('📤 Smart upload data with dropdowns:', postData);
+			console.log('📤 Smart upload data with proper datetime:', postData);
 
 			await this.plugin.uploadPost(this.currentFile, { asDraft: this.asDraft });
 			new Notice(`✅ Successfully uploaded as ${this.selectedContentType.name}!`);
@@ -1235,6 +1266,11 @@ private async handleMetadataUpdate() {
 					box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
 				}
 
+				/* DateTime field specific styling */
+				.tab-form-field.datetime-field {
+					background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+				}
+
 				.field-header {
 					margin-bottom: 8px;
 				}
@@ -1314,6 +1350,73 @@ private async handleMetadataUpdate() {
 					position: relative;
 					z-index: 1;
 					pointer-events: none;
+				}
+
+				/* DateTime Styling */
+				.datetime-field-container {
+					display: flex;
+					flex-direction: column;
+					gap: 8px;
+				}
+
+				.datetime-input-container {
+					display: flex;
+					gap: 12px;
+					align-items: center;
+					flex-wrap: wrap;
+				}
+
+				.datetime-date-input,
+				.datetime-time-input {
+					padding: 8px 12px;
+					border: 2px solid var(--background-modifier-border);
+					border-radius: 4px;
+					background: var(--background-primary);
+					color: var(--text-normal);
+					min-width: 130px;
+					font-family: var(--font-interface);
+				}
+
+				.datetime-date-input:focus,
+				.datetime-time-input:focus {
+					outline: none;
+					border-color: var(--interactive-accent);
+					box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+				}
+
+				.timezone-display {
+					color: var(--text-muted);
+					font-size: 0.85rem;
+					font-style: italic;
+					background: var(--background-secondary);
+					padding: 4px 8px;
+					border-radius: 12px;
+					border: 1px solid var(--background-modifier-border);
+				}
+
+				.quick-time-buttons {
+					display: flex;
+					gap: 6px;
+					flex-wrap: wrap;
+					margin-top: 8px;
+				}
+
+				.quick-time-btn {
+					padding: 4px 8px;
+					border: 1px solid var(--background-modifier-border);
+					border-radius: 3px;
+					background: var(--background-secondary);
+					color: var(--text-muted);
+					cursor: pointer;
+					font-size: 0.8rem;
+					transition: all 0.2s ease;
+				}
+
+				.quick-time-btn:hover {
+					border-color: var(--interactive-accent);
+					background: var(--background-modifier-hover);
+					color: var(--text-normal);
+					transform: translateY(-1px);
 				}
 
 				/* Asset Picker Styles */
@@ -1612,6 +1715,19 @@ private async handleMetadataUpdate() {
 				.footer-cancel-btn:hover {
 					background: var(--background-modifier-hover);
 					border-color: var(--text-muted);
+				}
+
+				@media (max-width: 600px) {
+					.datetime-input-container {
+						flex-direction: column;
+						align-items: stretch;
+					}
+					
+					.datetime-date-input,
+					.datetime-time-input {
+						min-width: auto;
+						width: 100%;
+					}
 				}
 			`;
 			document.head.appendChild(style);
