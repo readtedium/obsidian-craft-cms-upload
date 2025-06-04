@@ -10,6 +10,10 @@ export interface CraftCMSSettings {
 	timezone: string;
 	defaultPostTime: string;
 	dateFormat: 'iso' | 'craft';
+	// New webhook fields
+	webhookUrl?: string;
+	webhookEnabled?: boolean;
+	webhookHeaders?: Record<string, string>;
 }
 
 export interface PostData {

@@ -1,5 +1,5 @@
 // src/settings/settingsTab.ts - Updated with DateTime Settings
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice, requestUrl } from 'obsidian';
 import CraftCMSPlugin from '../../main';
 import { validateSettings } from './settings';
 
@@ -31,6 +31,9 @@ export class CraftCMSSettingTab extends PluginSettingTab {
 
 		// Behavior Settings
 		this.addBehaviorSettings(containerEl);
+
+		// Webhook Settings
+		this.addWebhookSettings(containerEl);
 
 		// Test Connection Button
 		this.addTestButton(containerEl);
@@ -264,6 +267,117 @@ export class CraftCMSSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 	}
+
+	private addWebhookSettings(containerEl: HTMLElement) {
+		containerEl.createEl('h3', { text: 'Webhook Settings' });
+
+		new Setting(containerEl)
+			.setName('Enable Webhooks')
+			.setDesc('Trigger webhooks after successful uploads')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.webhookEnabled || false)
+				.onChange(async (value) => {
+					this.plugin.settings.webhookEnabled = value;
+					await this.plugin.saveSettings();
+					// Refresh the display to show/hide webhook URL field
+					this.display();
+				}));
+
+		if (this.plugin.settings.webhookEnabled) {
+			new Setting(containerEl)
+				.setName('Webhook URL')
+				.setDesc('URL to POST webhook data to after successful uploads')
+				.addText(text => text
+					.setPlaceholder('https://your-site.com/webhook')
+					.setValue(this.plugin.settings.webhookUrl || '')
+					.onChange(async (value) => {
+						this.plugin.settings.webhookUrl = value;
+						await this.plugin.saveSettings();
+					}));
+
+			new Setting(containerEl)
+				.setName('Webhook Headers')
+				.setDesc('Custom headers to send with webhook (JSON format, e.g., {"Authorization": "Bearer token"})')
+				.addTextArea(text => {
+					const headersJson = JSON.stringify(this.plugin.settings.webhookHeaders || {}, null, 2);
+					return text
+						.setPlaceholder('{\n  "Authorization": "Bearer your-token",\n  "X-Custom-Header": "value"\n}')
+						.setValue(headersJson)
+						.onChange(async (value) => {
+							try {
+								const headers = value.trim() ? JSON.parse(value) : {};
+								this.plugin.settings.webhookHeaders = headers;
+								await this.plugin.saveSettings();
+							} catch (error) {
+								console.error('Invalid JSON in webhook headers:', error);
+							}
+						});
+				});
+
+			// Test webhook button
+			const webhookTestContainer = containerEl.createDiv('craft-button-container');
+			const testWebhookBtn = webhookTestContainer.createEl('button', {
+				text: '🪝 Test Webhook',
+				cls: 'mod-secondary'
+			});
+
+			testWebhookBtn.addEventListener('click', async () => {
+				await this.testWebhook(testWebhookBtn);
+			});
+		}
+	}
+
+	private async testWebhook(button: HTMLButtonElement) {
+		if (!this.plugin.settings.webhookUrl) {
+			new Notice('Please configure webhook URL first');
+			return;
+		}
+
+		button.disabled = true;
+		button.textContent = '🔄 Testing...';
+
+		try {
+			// Import requestUrl at the top of the file if not already imported
+			const { requestUrl } = require('obsidian');
+			
+			// Create test payload
+			const testPayload = {
+				event: 'webhook_test',
+				timestamp: new Date().toISOString(),
+				source: 'obsidian-plugin',
+				message: 'This is a test webhook from Obsidian Craft CMS Plugin'
+			};
+
+			const response = await requestUrl({
+				url: this.plugin.settings.webhookUrl,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'User-Agent': 'Obsidian-Craft-CMS-Plugin/1.0',
+					...(this.plugin.settings.webhookHeaders || {})
+				},
+				body: JSON.stringify(testPayload)
+			});
+
+			if (response.status >= 200 && response.status < 300) {
+				new Notice(`✅ Webhook test successful! (${response.status})`);
+			} else {
+				new Notice(`⚠️ Webhook returned status ${response.status}`);
+			}
+
+		} catch (error) {
+			console.error('Webhook test failed:', error);
+			new Notice(`❌ Webhook test failed: ${error.message}`);
+		} finally {
+			button.disabled = false;
+			button.textContent = '🪝 Test Webhook';
+		}
+
+		// Also update connection status
+		const statusEl = document.querySelector('.craft-connection-status') as HTMLElement;
+		if (statusEl) this.updateConnectionStatus(statusEl);
+	}
+
 
 	private addTestButton(containerEl: HTMLElement) {
 		const buttonContainer = containerEl.createDiv('craft-button-container');

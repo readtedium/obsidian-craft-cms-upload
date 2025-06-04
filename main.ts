@@ -120,6 +120,23 @@ export default class CraftCMSPlugin extends Plugin {
 				new TabbedUploadModal(this.app, this).open();
 			}
 		});
+
+		this.addCommand({
+			id: 'trigger-webhook-current-post',
+			name: 'Trigger webhook for current post',
+			callback: async () => {
+				await this.triggerWebhookForCurrentPost();
+			}
+		});
+
+		this.addCommand({
+			id: 'force-craft-resave',
+			name: 'Force Craft CMS re-save (triggers webhooks)',
+			callback: async () => {
+				await this.forceCraftResaveCurrentPost();
+			}
+		});
+
 	}
 
 	async openInCraft() {
@@ -296,6 +313,29 @@ export default class CraftCMSPlugin extends Plugin {
 		}
 
 		console.log('✅ Post processed successfully:', result);
+
+		// Trigger webhook if enabled
+		if (this.settings.webhookEnabled && this.settings.webhookUrl && result) {
+			try {
+				const webhookSuccess = await this.api.triggerWebhook(
+					result, 
+					this.settings.webhookUrl, 
+					this.settings.webhookHeaders || {}
+				);
+				
+				if (webhookSuccess) {
+					new Notice(`✅ Post uploaded with ${tagIds.length} tags + webhook triggered!`);
+				} else {
+					new Notice(`✅ Post uploaded with ${tagIds.length} tags (webhook failed)`);
+				}
+			} catch (error) {
+				console.error('Webhook trigger failed:', error);
+				new Notice(`✅ Post uploaded with ${tagIds.length} tags (webhook error)`);
+			}
+		} else {
+			new Notice(`✅ Post uploaded successfully with ${tagIds.length} tags!`);
+		}
+
 		new Notice(`✅ Post uploaded successfully with ${tagIds.length} tags!`);
 	}
 
@@ -373,6 +413,91 @@ export default class CraftCMSPlugin extends Plugin {
 			console.error('💥 Smart upload failed:', error);
 			new Notice(`Smart upload failed: ${error.message}. Using standard upload.`);
 			await this.uploadCurrentPost();
+		}
+	}
+
+	async triggerWebhookForCurrentPost() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView?.file) {
+			new Notice('No active file found');
+			return;
+		}
+
+		const content = await this.app.vault.read(activeView.file);
+		const { frontmatter } = parseFrontmatter(content);
+
+		if (!frontmatter.craftPostId) {
+			new Notice('No Craft CMS post ID found in frontmatter');
+			return;
+		}
+
+		if (!this.settings.webhookEnabled || !this.settings.webhookUrl) {
+			new Notice('Webhook not configured. Check plugin settings.');
+			return;
+		}
+
+		try {
+			new Notice('🪝 Triggering webhook...');
+
+			// Create mock post data for webhook
+			const mockPostData = {
+				id: frontmatter.craftPostId,
+				title: frontmatter.title || activeView.file.basename,
+				slug: frontmatter.slug || '',
+				url: frontmatter.craftUrl || '',
+				deck: frontmatter.deck || '',
+				shortDeck: frontmatter.shortDeck || '',
+				postDate: frontmatter.postDate || '',
+				tags: frontmatter.tags || []
+			};
+
+			const success = await this.api.triggerWebhook(
+				mockPostData as any,
+				this.settings.webhookUrl,
+				this.settings.webhookHeaders || {}
+			);
+
+			if (success) {
+				new Notice('✅ Webhook triggered successfully!');
+			} else {
+				new Notice('❌ Webhook failed');
+			}
+
+		} catch (error) {
+			console.error('Webhook trigger failed:', error);
+			new Notice(`Webhook failed: ${error.message}`);
+		}
+	}
+
+	async forceCraftResaveCurrentPost() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView?.file) {
+			new Notice('No active file found');
+			return;
+		}
+
+		const content = await this.app.vault.read(activeView.file);
+		const { frontmatter } = parseFrontmatter(content);
+
+		if (!frontmatter.craftPostId) {
+			new Notice('No Craft CMS post ID found in frontmatter');
+			return;
+		}
+
+		try {
+			new Notice('🔄 Force re-saving in Craft CMS...');
+			
+			const success = await this.api.forceCraftResave(frontmatter.craftPostId);
+			
+			if (success) {
+				new Notice('✅ Craft CMS re-save completed (webhooks should trigger)');
+			} else {
+				new Notice('❌ Craft CMS re-save failed');
+			}
+
+		} catch (error) {
+			console.error('Force re-save failed:', error);
+			new Notice(`Force re-save failed: ${error.message}`);
 		}
 	}
 }

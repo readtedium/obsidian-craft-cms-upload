@@ -547,6 +547,123 @@ export class CraftAPI {
 		return response.data.save_images_Asset;
 	}
 
+	async triggerWebhook(postData: CraftPost, webhookUrl: string, customHeaders: Record<string, string> = {}): Promise<boolean> {
+		if (!webhookUrl) {
+			console.log('⚠️ No webhook URL configured');
+			return false;
+		}
+
+		try {
+			console.log('🪝 Triggering webhook:', webhookUrl);
+			
+			// Prepare webhook payload
+			const payload = {
+				event: 'post_updated',
+				timestamp: new Date().toISOString(),
+				source: 'obsidian-plugin',
+				post: {
+					id: postData.id,
+					title: postData.title,
+					slug: postData.slug,
+					url: postData.url,
+					deck: postData.deck,
+					shortDeck: postData.shortDeck,
+					postDate: postData.postDate,
+					tags: postData.tags
+				}
+			};
+
+			const headers = {
+				'Content-Type': 'application/json',
+				'User-Agent': 'Obsidian-Craft-CMS-Plugin/1.0',
+				...customHeaders
+			};
+
+			const response = await requestUrl({
+				url: webhookUrl,
+				method: 'POST',
+				headers: headers,
+				body: JSON.stringify(payload)
+			});
+
+			if (response.status >= 200 && response.status < 300) {
+				console.log('✅ Webhook triggered successfully:', response.status);
+				return true;
+			} else {
+				console.error('❌ Webhook failed with status:', response.status);
+				return false;
+			}
+
+		} catch (error) {
+			console.error('💥 Webhook error:', error);
+			return false;
+		}
+	}
+
+	// Alternative method: Force Craft to re-save entry (triggers built-in webhooks)
+	async forceCraftResave(postId: string): Promise<boolean> {
+		try {
+			console.log('🔄 Force re-saving post in Craft to trigger webhooks...');
+			
+			// First get the current post data
+			const getQuery = `
+				query GetPost($id: [ID]) {
+					entries(id: $id, limit: 1) {
+						id
+						title
+						enabled
+						... on posts_posts_Entry {
+							deck
+							shortDeck
+							body
+							slug
+							postDate
+						}
+					}
+				}
+			`;
+
+			const getResponse = await this.makeRequest<{ entries: any[] }>(getQuery, { id: [postId] });
+			
+			if (!getResponse.data?.entries?.[0]) {
+				throw new Error('Could not fetch post for re-save');
+			}
+
+			const post = getResponse.data.entries[0];
+
+			// Now re-save with the same data (this should trigger webhooks)
+			const saveQuery = `
+				mutation ForceSave($id: ID!, $title: String, $enabled: Boolean) {
+					save_posts_posts_Entry(
+						id: $id,
+						title: $title,
+						enabled: $enabled
+					) {
+						id
+						title
+					}
+				}
+			`;
+
+			const saveResponse = await this.makeRequest(saveQuery, { 
+				id: postId,
+				title: post.title,
+				enabled: post.enabled
+			});
+
+			if (saveResponse.errors) {
+				throw new Error(`Force re-save failed: ${JSON.stringify(saveResponse.errors)}`);
+			}
+
+			console.log('✅ Successfully forced Craft re-save (should trigger webhooks)');
+			return true;
+
+		} catch (error) {
+			console.error('💥 Force re-save failed:', error);
+			return false;
+		}
+	}
+
 	// For future content pulling feature
 	async getPostBySlug(slug: string): Promise<CraftPost | null> {
 		const query = `

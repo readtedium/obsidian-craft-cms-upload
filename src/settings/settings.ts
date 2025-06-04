@@ -1,3 +1,4 @@
+// Update src/settings/settings.ts
 import { CraftCMSSettings } from '../api/types';
 
 export const DEFAULT_SETTINGS: CraftCMSSettings = {
@@ -9,7 +10,11 @@ export const DEFAULT_SETTINGS: CraftCMSSettings = {
 	baseUrl: 'https://your-site.com',
 	timezone: 'America/New_York',
 	defaultPostTime: '09:00',
-	dateFormat: 'iso'
+	dateFormat: 'iso',
+	// Add webhook defaults
+	webhookUrl: '',
+	webhookEnabled: false,
+	webhookHeaders: {}
 };
 
 export function validateSettings(settings: CraftCMSSettings): string[] {
@@ -43,6 +48,15 @@ export function validateSettings(settings: CraftCMSSettings): string[] {
 			new URL(settings.baseUrl);
 		} catch {
 			errors.push('Base URL must be a valid URL');
+		}
+	}
+
+	// Validate webhook URL if enabled
+	if (settings.webhookEnabled && settings.webhookUrl) {
+		try {
+			new URL(settings.webhookUrl);
+		} catch {
+			errors.push('Webhook URL must be a valid URL');
 		}
 	}
 
