@@ -13,23 +13,24 @@ This was built as part of an experiment in vibe coding by Tedium editor [Ernie S
 ### ✅ What Works Now
 
 - **Article Publishing**: Upload markdown posts with full frontmatter support
+- **Automatic Tag Creation**: Tags that don't exist are automatically created during upload
 - **Image Management**: Upload images directly from Obsidian with drag-and-drop support
 - **Smart Forms**: Dynamic upload forms that adapt to your Craft CMS content types
 - **Schema Introspection**: Automatically discover your Craft CMS structure (sections, fields, content types)
-- **Tag Support**: Automatic tag discovery and assignment
 - **Draft Mode**: Save posts as drafts before publishing
 - **Frontmatter Integration**: Seamlessly sync metadata between Obsidian and Craft CMS
 - **Connection Testing**: Built-in tools to validate your API setup
 - **Advanced DateTime Handling**: Timezone-aware scheduling with precise time control
 - **Professional Upload Interface**: Tabbed forms with asset pickers and real-time validation
+- **Webhook Integration**: Automatic webhook triggering after uploads + manual webhook commands
+- **Force Craft Re-save**: Trigger Craft's built-in webhooks without manual reloading
 
 ### 🔄 In Development
 
-- **Author & Category Management**: Enhanced handling of taxonomies
+- **Enhanced Author & Category Management**: Improved handling of taxonomies
 - **Batch Operations**: Upload multiple posts at once
 - **Content Pulling**: Import existing Craft CMS content for editing in Obsidian
 - **Advanced Field Mapping**: Smarter handling of custom field types
-- **Webhook Integration**: Real-time sync between Obsidian and Craft CMS
 
 ## Features
 
@@ -66,6 +67,7 @@ The plugin automatically:
 
 - Maps frontmatter fields to Craft CMS fields
 - Handles complex field types (assets, relations, taxonomies)
+- **Creates missing tags automatically** during upload
 - Preserves existing content when updating
 - Maintains clean, canonical metadata
 
@@ -75,6 +77,14 @@ The plugin automatically:
 - Automatic filename sanitization
 - Asset picker interface
 - Generate Craft CMS asset codes for embedding
+
+### Webhook Integration
+
+- **Automatic webhook triggering** after successful uploads
+- **Manual webhook commands** for existing posts
+- **Force Craft re-save** functionality (triggers built-in Craft webhooks)
+- Configurable webhook headers and authentication
+- Built-in webhook testing tools
 
 ## Setup
 
@@ -136,6 +146,7 @@ Navigate to **Settings → Craft CMS Upload** in Obsidian and configure:
 - **Timezone**: Your site's timezone for accurate post scheduling
 - **Default Post Time**: Preferred time for new posts (e.g., "09:00" for 9 AM)
 - **Date Format**: How dates are formatted for Craft CMS (ISO 8601 recommended)
+- **Webhook Settings**: Configure automatic webhook triggering after uploads
 
 #### Finding Your Author ID
 In Craft CMS, go to **Users**, click on your user account, and look at the URL. The number at the end is your Author ID (e.g., `/admin/users/1` means your Author ID is `1`).
@@ -181,6 +192,14 @@ Use **Cmd/Ctrl + P** → "Analyze Craft CMS Schema" to:
 - View field counts and organization
 - Debug schema-related issues
 
+### Webhook Management
+
+Configure webhooks in plugin settings, then:
+
+- **Automatic**: Webhooks trigger after every successful upload
+- **Manual**: Use **Cmd/Ctrl + P** → "Trigger webhook for current post"
+- **Force Re-save**: Use **Cmd/Ctrl + P** → "Force Craft CMS re-save" to trigger built-in Craft webhooks
+
 ## Technical Architecture
 
 ### Key Components
@@ -191,6 +210,7 @@ Use **Cmd/Ctrl + P** → "Analyze Craft CMS Schema" to:
 - **Image Manager**: Handles asset uploads and management
 - **API Client**: Robust GraphQL client with error handling
 - **DateTime Manager**: Advanced timezone-aware date/time handling
+- **Webhook Manager**: Handles webhook triggering and Craft re-save functionality
 
 ### Smart Field Mapping
 
@@ -227,6 +247,8 @@ The plugin dynamically generates forms based on your Craft CMS schema:
 | `Open post in Craft CMS` | Open current post in Craft admin |
 | `Test Craft CMS connection` | Validate API configuration |
 | `Analyze Craft CMS Schema` | Explore your CMS structure |
+| `Trigger webhook for current post` | Manual webhook trigger |
+| `Force Craft CMS re-save (triggers webhooks)` | Force Craft re-save to trigger webhooks |
 
 ## Frontmatter Support
 
@@ -249,7 +271,7 @@ postAuthor: "Author Name"
 metaHeadline: "SEO Title"
 metaDescription: "SEO description"
 
-# Taxonomy
+# Taxonomy (automatically created if missing)
 tags: ["tag1", "tag2"]
 category: "Category Name"
 
@@ -313,6 +335,17 @@ src/
 - Ensure your Craft CMS server timezone matches your configuration
 - Use the datetime preview in settings to verify current time display
 
+**Tag Creation Issues**
+- Ensure your API token has permissions to create tags
+- Verify the `save_tags_Tag` mutation is available in your schema
+- Check browser console for tag creation errors
+
+**Webhook Issues**
+- Test webhook configuration using the built-in test button
+- Verify webhook URL is accessible and returns 200-299 status codes
+- Check webhook headers are properly formatted JSON
+- Use "Force Craft CMS re-save" as alternative to trigger built-in webhooks
+
 ### Debug Mode
 
 Enable debug logging by opening browser console while using the plugin. All operations log detailed information for troubleshooting.
@@ -326,7 +359,7 @@ Enable debug logging by opening browser console while using the plugin. All oper
 - **Template System**: Predefined content templates
 - **Preview Mode**: Preview before publish
 - **Workflow Integration**: Editorial workflow support
-- **Webhook Integration**: Real-time bidirectional sync
+- **Advanced Webhook Features**: Conditional webhooks, webhook templates, retry logic
 
 ## Contributing
 
