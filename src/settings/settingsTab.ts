@@ -134,6 +134,17 @@ export class CraftCMSSettingTab extends PluginSettingTab {
 					this.plugin.settings.baseUrl = value;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Live URL Base')
+			.setDesc('Your live site URL base (e.g., https://tedium.co for the final published URLs)')
+			.addText(text => text
+				.setPlaceholder('https://tedium.co')
+				.setValue(this.plugin.settings.liveUrlBase)
+				.onChange(async (value) => {
+					this.plugin.settings.liveUrlBase = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 
 	private addContentSettings(containerEl: HTMLElement) {

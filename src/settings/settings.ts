@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: CraftCMSSettings = {
 	authorId: '1',
 	autoSavePostId: true,
 	baseUrl: 'https://your-site.com',
+	liveUrlBase: 'https://tedium.co', 
 	timezone: 'America/New_York',
 	defaultPostTime: '09:00',
 	dateFormat: 'iso',

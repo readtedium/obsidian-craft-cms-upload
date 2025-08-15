@@ -6,6 +6,7 @@ export interface CraftCMSSettings {
 	authorId: string;
 	autoSavePostId: boolean;
 	baseUrl: string;
+	liveUrlBase: string;
 	// New datetime fields
 	timezone: string;
 	defaultPostTime: string;
