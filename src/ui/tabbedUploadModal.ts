@@ -5,6 +5,7 @@ import { PostData } from '../api/types';
 import { parseFrontmatter, updateFrontmatter } from '../utils/frontmatter';
 import { slugify } from '../utils/textUtils';
 import { DateTimeManager, renderDateTimeField } from '../utils/dateUtils';
+import { renderFormFieldWithLimits, getEnhancedFormFieldCSS } from '../utils/enhancedFormField';
 
 export class TabbedUploadModal extends Modal {
 	private plugin: CraftCMSPlugin;
@@ -17,6 +18,8 @@ export class TabbedUploadModal extends Modal {
 	private activeTab: string = 'article';
 	private dropdownOptions: Record<string, Array<{value: string, label: string, url?: string, filename?: string, width?: number, height?: number}>> = {};
 	private dateTimeManager: DateTimeManager;
+	private fieldValidationState: Map<string, boolean> = new Map();
+	private hasValidationErrors: boolean = false;
 
 	// Tab configuration matching Craft CMS style
 	private tabs: Record<string, { name: string; icon: string; fields: string[] }> = {
@@ -708,7 +711,7 @@ export class TabbedUploadModal extends Modal {
 	}
 
 	private renderFormField(container: HTMLElement, field: FormFieldDefinition) {
-		// Special handling for date/time fields
+		// Special handling for date/time fields (unchanged)
 		if (field.name === 'postDate' || field.type === 'date' || field.name.includes('Date')) {
 			const fieldContainer = container.createDiv('tab-form-field datetime-field');
 			renderDateTimeField(
@@ -718,112 +721,71 @@ export class TabbedUploadModal extends Modal {
 				this.dateTimeManager,
 				(value) => {
 					this.formData[field.name] = value;
+					this.updateValidationState(field.name, true); // DateTime fields are always valid
 					console.log(`📅 Updated ${field.name}:`, value);
 				}
 			);
 			return;
 		}
 
-		const fieldContainer = container.createDiv('tab-form-field');
-		
-		const fieldHeader = fieldContainer.createDiv('field-header');
-		const label = fieldHeader.createEl('label', { cls: 'field-label' });
-		label.innerHTML = `
-			<span class="field-name">${field.label}</span>
-			${field.required ? '<span class="required-indicator">*</span>' : ''}
-		`;
-		
-		if (field.description) {
-			fieldHeader.createEl('div', { 
-				text: field.description, 
-				cls: 'field-description' 
-			});
-		}
-
-		// Check if this field should have an asset picker instead of dropdown/input
+		// Special handling for asset fields (keep your existing asset picker logic)
 		const isAssetField = ['image', 'featuredImage', 'sidebarAd', 'topAd'].includes(field.name);
 		
 		if (isAssetField && this.dropdownOptions[field.name] && this.dropdownOptions[field.name].length > 0) {
-			// Render asset picker interface
-			this.renderAssetPicker(fieldContainer, field);
+			this.renderAssetPicker(container, field);
 			return;
 		}
 
-		let input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-		const inputContainer = fieldContainer.createDiv('field-input-container');
+		// NEW: Create validator function for character limits
+		const validator = (value: string) => {
+			// Use the plugin's schema manager to validate
+			return this.plugin.schemaManager.schemaIntrospector.validateFieldValue(
+				field.name, 
+				value, 
+				{
+					...field,
+					characterLimit: field.maxLength,
+					validationRules: field.validationRules
+				} as any
+			);
+		};
 
+		// Handle dropdown options
 		const hasDropdownOptions = this.dropdownOptions[field.name] && 
 									this.dropdownOptions[field.name].length > 0;
 
 		if (hasDropdownOptions) {
-			input = inputContainer.createEl('select', { cls: 'field-input' });
-			const selectInput = input as HTMLSelectElement;
+			// For dropdown fields, use the enhanced renderer but as a select
+			const enhancedField = { 
+				...field, 
+				type: 'select' as const, 
+				options: this.dropdownOptions[field.name].map(opt => ({ value: opt.value, label: opt.label })) 
+			};
 			
-			const emptyOption = selectInput.createEl('option');
-			emptyOption.value = '';
-			emptyOption.textContent = `Select ${field.label}...`;
-			
-			this.dropdownOptions[field.name].forEach(option => {
-				const opt = selectInput.createEl('option');
-				opt.value = option.value;
-				opt.textContent = option.label;
-			});
-
-			console.log(`🎯 Created dropdown for ${field.name} with ${this.dropdownOptions[field.name].length} options`);
+			renderFormFieldWithLimits(
+				container,
+				enhancedField,
+				this.formData[field.name] || '',
+				(value, isValid) => {
+					this.formData[field.name] = value;
+					this.updateValidationState(field.name, isValid);
+					console.log(`🎯 Updated dropdown ${field.name}:`, value);
+				}
+			);
 		} else {
-			switch (field.type) {
-				case 'textarea':
-					input = inputContainer.createEl('textarea', { cls: 'field-input' });
-					(input as HTMLTextAreaElement).rows = field.name === 'body' ? 8 : 4;
-					break;
-				case 'checkbox':
-					const checkboxContainer = inputContainer.createDiv('checkbox-container');
-					input = checkboxContainer.createEl('input', { type: 'checkbox', cls: 'field-checkbox' });
-					const label = checkboxContainer.createSpan({ text: 'Enable', cls: 'checkbox-label' });
-					// Ensure the label comes after the input in DOM order
-					checkboxContainer.appendChild(input);
-					checkboxContainer.appendChild(label);
-					break;
-				case 'select':
-					input = inputContainer.createEl('select', { cls: 'field-input' });
-					if (field.options) {
-						field.options.forEach(option => {
-							const opt = (input as HTMLSelectElement).createEl('option');
-							opt.value = option.value;
-							opt.textContent = option.label;
-						});
-					}
-					break;
-				default:
-					input = inputContainer.createEl('input', { 
-						type: field.type, 
-						cls: 'field-input'
-					});
-			}
+			// NEW: Use the enhanced form field renderer with character limit validation
+			renderFormFieldWithLimits(
+				container,
+				field,
+				this.formData[field.name] || '',
+				(value, isValid) => {
+					this.formData[field.name] = value;
+					this.updateValidationState(field.name, isValid);
+					console.log(`📝 Updated ${field.name}:`, value, `(valid: ${isValid})`);
+				},
+				validator
+			);
 		}
-
-		if (field.placeholder && !hasDropdownOptions && 
-			(field.type !== 'select' && field.type !== 'checkbox')) {
-			(input as HTMLInputElement | HTMLTextAreaElement).placeholder = field.placeholder;
-		}
-
-		const initialValue = this.formData[field.name];
-		if (initialValue !== undefined) {
-			if (field.type === 'checkbox') {
-				(input as HTMLInputElement).checked = Boolean(initialValue);
-			} else {
-				input.value = String(initialValue);
-			}
-		}
-
-		input.addEventListener('change', () => {
-			if (field.type === 'checkbox') {
-				this.formData[field.name] = (input as HTMLInputElement).checked;
-			} else {
-				this.formData[field.name] = input.value;
-			}
-			console.log(`📝 Updated ${field.name}:`, this.formData[field.name]);
-		});
 	}
 
 	private renderUploadOptionsInTab(container: HTMLElement) {
@@ -1049,10 +1011,27 @@ export class TabbedUploadModal extends Modal {
 			return;
 		}
 
-		try {
-			new Notice('🚀 Starting smart upload...');
+		// NEW: Final validation check
+		if (this.hasValidationErrors) {
+			const errorFields = Array.from(this.fieldValidationState.entries())
+				.filter(([_, isValid]) => !isValid)
+				.map(([fieldName, _]) => fieldName);
+			
+			new Notice(`❌ Cannot upload: Validation errors in fields: ${errorFields.join(', ')}`);
+			return;
+		}
 
-			// Ensure postDate is properly formatted with timezone
+		try {
+			new Notice('🚀 Starting validated upload...');
+
+			// Show which fields have character limits in the log
+			const fieldsWithLimits = this.formFields.filter(f => f.maxLength);
+			if (fieldsWithLimits.length > 0) {
+				console.log('📏 Fields with character limits validated:', 
+					fieldsWithLimits.map(f => `${f.name}: ${this.formData[f.name]?.length || 0}/${f.maxLength}`));
+			}
+
+			// Your existing upload logic continues...
 			const formattedPostDate = this.dateTimeManager.processFrontmatterDate(this.formData.postDate);
 
 			const postData: PostData = {
@@ -1065,7 +1044,7 @@ export class TabbedUploadModal extends Modal {
 				metaDescription: this.formData.metaDescription,
 				tags: this.formData.tags ? this.formData.tags.split(',').map((t: string) => t.trim()) : [],
 				enabled: this.asDraft ? false : (this.formData.enabled ?? true),
-				postDate: formattedPostDate, // Properly formatted datetime with timezone
+				postDate: formattedPostDate,
 				...Object.fromEntries(
 					Object.entries(this.formData).filter(([key]) => 
 						!['title', 'body', 'deck', 'shortDeck', 'slug', 'metaHeadline', 
@@ -1074,23 +1053,80 @@ export class TabbedUploadModal extends Modal {
 				)
 			};
 
-			console.log('📤 Smart upload data with proper datetime:', postData);
+			console.log('📤 Validated upload data:', postData);
 
 			await this.plugin.uploadPost(this.currentFile, { asDraft: this.asDraft });
-			new Notice(`✅ Successfully uploaded as ${this.selectedContentType.name}!`);
+			new Notice(`✅ Successfully uploaded ${this.selectedContentType.name} with validated character limits!`);
 			this.close();
 
 		} catch (error) {
-			console.error('💥 Smart upload failed:', error);
+			console.error('💥 Upload failed:', error);
 			new Notice(`Upload failed: ${error.message}`);
 		}
 	}
 
+	private updateValidationState(fieldName: string, isValid: boolean) {
+		this.fieldValidationState.set(fieldName, isValid);
+		
+		// Check if we have any validation errors
+		this.hasValidationErrors = Array.from(this.fieldValidationState.values()).some(valid => !valid);
+		
+		// Update upload button state
+		this.updateUploadButtonState();
+	}
+
+	private updateUploadButtonState() {
+		const uploadBtn = this.containerEl.querySelector('.footer-upload-btn') as HTMLButtonElement;
+		
+		if (uploadBtn) {
+			if (this.hasValidationErrors) {
+				uploadBtn.disabled = true;
+				uploadBtn.textContent = '⚠️ Fix Errors to Upload';
+				uploadBtn.addClass('disabled-with-errors');
+			} else {
+				uploadBtn.disabled = false;
+				uploadBtn.textContent = '🚀 Smart Upload';
+				uploadBtn.removeClass('disabled-with-errors');
+			}
+		}
+	}
+
+	// UPDATE your addModalStyles method to include the enhanced CSS:
 	private addModalStyles() {
-		if (!document.querySelector('#tabbed-upload-modal-css')) {
+		if (!document.querySelector('#enhanced-tabbed-upload-modal-css')) {
 			const style = document.createElement('style');
-			style.id = 'tabbed-upload-modal-css';
+			style.id = 'enhanced-tabbed-upload-modal-css';
 			style.textContent = `
+				/* Your existing modal styles */
+				.modal.mod-tabbed-upload {
+					max-width: 1200px !important;
+					width: 1200px !important;
+					min-height: 800px !important;
+				}
+
+				.modal.mod-tabbed-upload .modal-content {
+					padding: 0 !important;
+					max-width: none !important;
+					width: 100% !important;
+				}
+
+				/* Enhanced upload button states */
+				.footer-upload-btn.disabled-with-errors {
+					background: var(--background-modifier-error) !important;
+					color: var(--text-error) !important;
+					cursor: not-allowed !important;
+					transform: none !important;
+					box-shadow: none !important;
+				}
+
+				.footer-upload-btn.disabled-with-errors:hover {
+					transform: none !important;
+					box-shadow: none !important;
+				}
+
+				/* Include enhanced form field styles */
+				${getEnhancedFormFieldCSS()}
+
 				/* Modal sizing */
 				.modal.mod-tabbed-upload {
 					max-width: 1200px !important;

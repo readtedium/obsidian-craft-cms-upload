@@ -13,6 +13,13 @@ export class SchemaManager {
 	}
 
 	/**
+	 * NEW: Expose the introspector for direct access to validation methods
+	 */
+	get schemaIntrospector(): SchemaIntrospector {
+		return this.introspector;
+	}
+
+	/**
 	 * Get analyzed schema sections (with caching)
 	 */
 	async getSections(forceRefresh = false): Promise<CraftSection[]> {
@@ -31,6 +38,17 @@ export class SchemaManager {
 			
 			this.cachedSections = await this.introspector.analyzeSchema();
 			this.lastAnalysis = now;
+			
+			// Log fields with character limits found
+			const sectionsWithLimits = this.cachedSections.filter(section => 
+				section.entryTypes.some(contentType => 
+					this.introspector.hasCharacterLimits(contentType)
+				)
+			);
+			
+			if (sectionsWithLimits.length > 0) {
+				console.log('📏 Sections with character limits detected:', sectionsWithLimits.map(s => s.name));
+			}
 			
 			new Notice(`✅ Found ${this.cachedSections.length} content sections`);
 			return this.cachedSections;
@@ -92,7 +110,7 @@ export class SchemaManager {
 	}
 
 	/**
-	 * Get schema summary for debugging/display
+	 * Enhanced schema summary including character limit information
 	 */
 	async getSchemaSummary(): Promise<SchemaSummary> {
 		const sections = await this.getSections();
@@ -100,6 +118,7 @@ export class SchemaManager {
 		let totalContentTypes = 0;
 		let totalFields = 0;
 		let customFields = 0;
+		let fieldsWithLimits = 0;
 
 		for (const section of sections) {
 			totalContentTypes += section.entryTypes.length;
@@ -107,6 +126,7 @@ export class SchemaManager {
 			for (const contentType of section.entryTypes) {
 				totalFields += contentType.fields.length;
 				customFields += contentType.fields.filter(f => f.isCustomField).length;
+				fieldsWithLimits += contentType.fields.filter(f => f.characterLimit !== undefined).length;
 			}
 		}
 
@@ -115,6 +135,7 @@ export class SchemaManager {
 			contentTypesCount: totalContentTypes,
 			totalFieldsCount: totalFields,
 			customFieldsCount: customFields,
+			fieldsWithLimitsCount: fieldsWithLimits, // NEW
 			lastAnalysis: new Date(this.lastAnalysis),
 			sections: sections.map(s => ({
 				handle: s.handle,
@@ -122,14 +143,15 @@ export class SchemaManager {
 				entryTypes: s.entryTypes.map(et => ({
 					handle: et.handle,
 					name: et.name,
-					fieldsCount: et.fields.length
+					fieldsCount: et.fields.length,
+					fieldsWithLimitsCount: et.fields.filter(f => f.characterLimit !== undefined).length // NEW
 				}))
 			}))
 		};
 	}
 
 	/**
-	 * Validate that a content type supports required fields for upload
+	 * Enhanced validation with character limit checks
 	 */
 	async validateContentTypeForUpload(contentTypeHandle: string): Promise<ValidationResult> {
 		const contentType = await this.getContentType(contentTypeHandle);
@@ -162,12 +184,75 @@ export class SchemaManager {
 			warnings.push('Content type is missing a slug field - URLs may not work as expected');
 		}
 
+		// NEW: Check for fields with character limits and prepare the array correctly
+		const fieldsWithLimits = this.introspector.getFieldsWithLimits(contentType)
+			.filter(field => field.characterLimit !== undefined) // Filter out undefined values
+			.map(field => ({
+				name: field.name,
+				characterLimit: field.characterLimit! // Non-null assertion since we filtered above
+			}));
+
+		if (fieldsWithLimits.length > 0) {
+			console.log(`📏 Content type ${contentType.name} has ${fieldsWithLimits.length} fields with character limits:`,
+				fieldsWithLimits.map(f => `${f.name}: ${f.characterLimit} chars`));
+		}
+
 		return {
 			valid: errors.length === 0,
 			errors,
 			warnings,
-			contentType
+			contentType,
+			fieldsWithLimits // Now correctly typed
 		};
+	}
+
+	/**
+	 * NEW: Validate field values against character limits
+	 */
+	validateFieldValues(contentTypeHandle: string, fieldValues: Record<string, string>): Promise<FieldValidationResults> {
+		return new Promise(async (resolve) => {
+			const contentType = await this.getContentType(contentTypeHandle);
+			
+			if (!contentType) {
+				resolve({
+					valid: false,
+					fieldResults: {},
+					globalErrors: [`Content type '${contentTypeHandle}' not found`]
+				});
+				return;
+			}
+
+			const fieldResults: Record<string, any> = {};
+			let hasErrors = false;
+
+			// Validate each field value
+			for (const [fieldName, value] of Object.entries(fieldValues)) {
+				const field = contentType.fields.find(f => f.name === fieldName);
+				const result = this.introspector.validateFieldValue(fieldName, value, field);
+				
+				fieldResults[fieldName] = result;
+				if (!result.valid) {
+					hasErrors = true;
+				}
+			}
+
+			resolve({
+				valid: !hasErrors,
+				fieldResults,
+				globalErrors: []
+			});
+		});
+	}
+
+	/**
+	 * NEW: Get character limit for a specific field
+	 */
+	async getCharacterLimit(contentTypeHandle: string, fieldName: string): Promise<number | null> {
+		const contentType = await this.getContentType(contentTypeHandle);
+		if (!contentType) return null;
+
+		const field = contentType.fields.find(f => f.name === fieldName);
+		return field?.characterLimit || null;
 	}
 
 	/**
@@ -206,6 +291,7 @@ export interface SchemaSummary {
 	contentTypesCount: number;
 	totalFieldsCount: number;
 	customFieldsCount: number;
+	fieldsWithLimitsCount: number; // NEW
 	lastAnalysis: Date;
 	sections: Array<{
 		handle: string;
@@ -214,13 +300,29 @@ export interface SchemaSummary {
 			handle: string;
 			name: string;
 			fieldsCount: number;
+			fieldsWithLimitsCount: number; // NEW
 		}>;
 	}>;
 }
 
+// Fixed ValidationResult interface
 export interface ValidationResult {
 	valid: boolean;
 	errors: string[];
 	warnings?: string[];
 	contentType?: CraftContentType;
+	fieldsWithLimits?: Array<{ name: string; characterLimit: number }>; // Fixed: now requires characterLimit to be number
+}
+
+// NEW: Field validation results interface
+export interface FieldValidationResults {
+	valid: boolean;
+	fieldResults: Record<string, {
+		valid: boolean;
+		errors: string[];
+		warnings: string[];
+		characterCount?: number;
+		remainingCharacters?: number;
+	}>;
+	globalErrors: string[];
 }

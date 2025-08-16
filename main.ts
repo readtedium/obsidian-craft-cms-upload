@@ -174,6 +174,31 @@ export default class CraftCMSPlugin extends Plugin {
 
 	}
 
+	// Also add a method to extract real Craft field limits:
+	async testRealCraftLimits() {
+		try {
+			// This will test if we can detect the 300-character limit on your deck field
+			const sections = await this.schemaManager.getSections();
+			const postsSection = sections.find(s => s.handle === 'posts');
+			
+			if (postsSection) {
+				const postsContentType = postsSection.entryTypes.find(ct => ct.handle.includes('posts'));
+				if (postsContentType) {
+					const deckField = postsContentType.fields.find(f => f.name === 'deck');
+					if (deckField && deckField.characterLimit) {
+						console.log(`✅ Found real Craft limit for deck: ${deckField.characterLimit} characters`);
+						new Notice(`Found deck limit: ${deckField.characterLimit} characters`);
+					} else {
+						console.log('❌ Could not detect deck field limit from schema');
+						new Notice('Could not detect deck field limit - check console for details');
+					}
+				}
+			}
+		} catch (error) {
+			console.error('Real limit test failed:', error);
+		}
+	}
+
 	async openInCraft() {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!activeView?.file) {
