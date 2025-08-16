@@ -1,35 +1,28 @@
-// src/utils/enhancedFormField.ts - Fixed version
-import { FormFieldDefinition } from '../api/schemaIntrospector';
+// src/utils/enhancedFormField.ts - Simplified version with manual limits only
 
-// Fixed validation result interface
-interface ValidationResult {
-	valid: boolean;
-	errors: string[];
-	warnings: string[];
-	characterCount?: number;
-	remainingCharacters?: number;
-}
+import { FieldLimitsManager } from './fieldLimits';
 
 /**
- * Enhanced form field renderer with character limit enforcement
+ * Simple enhanced form field with manual character limits
  */
 export function renderFormFieldWithLimits(
 	container: HTMLElement,
-	field: FormFieldDefinition,
+	field: { name: string; label: string; type: string; required?: boolean; placeholder?: string; options?: Array<{value: string, label: string}> },
 	initialValue: string,
-	onChange: (value: string, isValid: boolean) => void,
-	validator?: (value: string) => ValidationResult
+	fieldLimitsManager: FieldLimitsManager,
+	onChange: (value: string, isValid: boolean) => void
 ): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+	
 	const fieldContainer = container.createDiv('enhanced-form-field');
+	const hasLimit = fieldLimitsManager.hasLimit(field.name);
 	
 	// Add character limit class if applicable
-	if (field.maxLength) {
+	if (hasLimit) {
 		fieldContainer.addClass('has-character-limit');
 	}
 
 	// Field header with label and character counter
 	const fieldHeader = fieldContainer.createDiv('field-header');
-	const label = fieldHeader.createEl('label', { cls: 'field-label' });
 	
 	const labelContent = fieldHeader.createDiv('label-content');
 	labelContent.innerHTML = `
@@ -39,17 +32,10 @@ export function renderFormFieldWithLimits(
 
 	// Character counter (only show for text fields with limits)
 	let characterCounter: HTMLElement | null = null;
-	if (field.maxLength && field.type !== 'checkbox' && field.type !== 'select') {
+	if (hasLimit && field.type !== 'checkbox' && field.type !== 'select') {
+		const limit = fieldLimitsManager.getLimit(field.name)!;
 		characterCounter = fieldHeader.createDiv('character-counter');
-		updateCharacterCounter(characterCounter, 0, field.maxLength);
-	}
-
-	// Field description
-	if (field.description) {
-		fieldHeader.createEl('div', { 
-			text: field.description, 
-			cls: 'field-description' 
-		});
+		updateCharacterCounter(characterCounter, 0, limit);
 	}
 
 	// Input container
@@ -86,13 +72,15 @@ export function renderFormFieldWithLimits(
 			});
 	}
 
-	// Set placeholder and max length
+	// Set placeholder
 	if (field.placeholder && field.type !== 'select' && field.type !== 'checkbox') {
 		(input as HTMLInputElement | HTMLTextAreaElement).placeholder = field.placeholder;
 	}
 
-	if (field.maxLength && field.type !== 'checkbox' && field.type !== 'select') {
-		input.setAttribute('maxlength', field.maxLength.toString());
+	// Set max length if there's a limit
+	if (hasLimit && field.type !== 'checkbox' && field.type !== 'select') {
+		const limit = fieldLimitsManager.getLimit(field.name)!;
+		input.setAttribute('maxlength', limit.toString());
 	}
 
 	// Validation message container
@@ -113,59 +101,33 @@ export function renderFormFieldWithLimits(
 			? String((input as HTMLInputElement).checked)
 			: input.value;
 
-		// Fixed: Create proper validation result with explicit types
-		let validationResult: ValidationResult;
+		// Validate using the field limits manager
+		const validation = fieldLimitsManager.validateField(field.name, currentValue);
 		
-		if (validator && field.type !== 'checkbox') {
-			validationResult = validator(currentValue);
-		} else {
-			// Initialize with explicit types to avoid TypeScript inference issues
-			validationResult = { 
-				valid: true, 
-				errors: [] as string[], 
-				warnings: [] as string[], 
-				characterCount: 0, 
-				remainingCharacters: undefined as number | undefined
-			};
-
-			if (field.maxLength && field.type !== 'checkbox') {
-				// Simple built-in validation
-				const length = currentValue.length;
-				validationResult.characterCount = length;
-				validationResult.remainingCharacters = field.maxLength - length;
-				
-				if (length > field.maxLength) {
-					validationResult.valid = false;
-					validationResult.errors.push(`Exceeds maximum length of ${field.maxLength} characters`);
-				} else if (length > field.maxLength * 0.9) {
-					validationResult.warnings.push(`Approaching character limit`);
-				}
-
-				if (field.required && length === 0) {
-					validationResult.valid = false;
-					validationResult.errors.push(`${field.label} is required`);
-				}
-			}
+		// Check required field
+		if (field.required && (!currentValue || currentValue.trim().length === 0)) {
+			validation.valid = false;
+			validation.errors.push(`${field.label} is required`);
 		}
 
 		// Update character counter
-		if (characterCounter && validationResult.characterCount !== undefined) {
+		if (characterCounter && validation.limit) {
 			updateCharacterCounter(
 				characterCounter, 
-				validationResult.characterCount, 
-				field.maxLength!,
-				validationResult.remainingCharacters
+				validation.characterCount, 
+				validation.limit,
+				validation.remaining
 			);
 		}
 
 		// Update validation messages
-		updateValidationMessages(validationContainer, validationResult);
+		updateValidationMessages(validationContainer, validation);
 
-		// Update field styling based on validation
-		updateFieldStyling(fieldContainer, input, validationResult);
+		// Update field styling
+		updateFieldStyling(fieldContainer, input, validation);
 
 		// Call the onChange callback
-		onChange(currentValue, validationResult.valid);
+		onChange(currentValue, validation.valid);
 	};
 
 	// Add event listeners
@@ -191,7 +153,7 @@ function updateCharacterCounter(
 	counterEl: HTMLElement, 
 	currentCount: number, 
 	maxLength: number,
-	remainingChars?: number
+	remainingChars?: number | null
 ): void {
 	const remaining = remainingChars ?? (maxLength - currentCount);
 	const percentage = (currentCount / maxLength) * 100;
@@ -248,7 +210,7 @@ function updateCharacterCounter(
  */
 function updateValidationMessages(
 	container: HTMLElement, 
-	result: ValidationResult
+	result: { valid: boolean; errors: string[]; warnings: string[] }
 ): void {
 	container.empty();
 
@@ -279,7 +241,7 @@ function updateValidationMessages(
 function updateFieldStyling(
 	fieldContainer: HTMLElement,
 	input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
-	result: ValidationResult
+	result: { valid: boolean; errors: string[]; warnings: string[] }
 ): void {
 	// Remove existing validation classes
 	fieldContainer.removeClass('field-valid', 'field-warning', 'field-error');
@@ -299,7 +261,7 @@ function updateFieldStyling(
 }
 
 /**
- * Get CSS styles for enhanced form fields
+ * Subtle CSS styles for enhanced form fields
  */
 export function getEnhancedFormFieldCSS(): string {
 	return `
@@ -318,194 +280,60 @@ export function getEnhancedFormFieldCSS(): string {
 		}
 
 		.enhanced-form-field.has-character-limit {
-			border-left: 4px solid var(--text-accent);
-		}
-
-		.enhanced-form-field.field-error {
-			border-color: var(--text-error);
-			background: rgba(239, 68, 68, 0.05);
-		}
-
-		.enhanced-form-field.field-warning {
-			border-color: var(--text-warning);
-			background: rgba(245, 158, 11, 0.05);
+			border-left: 3px solid var(--text-muted); /* Subtle gray instead of bright accent */
 		}
 
 		.enhanced-form-field.field-valid {
-			border-color: var(--text-success);
-		}
-
-		.field-header {
-			display: flex;
-			justify-content: space-between;
-			align-items: flex-start;
-			margin-bottom: 8px;
-			gap: 12px;
-		}
-
-		.label-content {
-			flex: 1;
-		}
-
-		.field-name {
-			font-weight: 600;
-			color: var(--text-normal);
-		}
-
-		.required-indicator {
-			color: var(--text-error);
-			margin-left: 2px;
-			font-weight: bold;
-		}
-
-		.field-description {
-			color: var(--text-muted);
-			margin-top: 4px;
-			line-height: 1.4;
-			font-size: 0.9rem;
-		}
-
-		.character-counter {
-			display: flex;
-			flex-direction: column;
-			align-items: flex-end;
-			gap: 4px;
-			min-width: 120px;
-		}
-
-		.count-display {
-			display: flex;
-			align-items: center;
-			gap: 2px;
-			font-family: monospace;
-			font-size: 0.9rem;
-		}
-
-		.count-current {
-			font-weight: bold;
-		}
-
-		.count-separator {
-			color: var(--text-muted);
-		}
-
-		.count-max {
-			color: var(--text-muted);
-		}
-
-		.over-limit {
-			color: var(--text-error);
-			font-weight: bold;
-			margin-left: 4px;
-		}
-
-		.remaining-display {
-			font-size: 0.8rem;
-			color: var(--text-muted);
-		}
-
-		.character-counter.warning .count-current {
-			color: var(--text-warning);
-		}
-
-		.character-counter.error .count-current {
-			color: var(--text-error);
+			border-color: var(--background-modifier-border-hover); /* Much more subtle than bright green */
 		}
 
 		.character-counter.safe .count-current {
-			color: var(--text-success);
+			color: var(--text-normal); /* Normal text color instead of bright green */
 		}
 
-		.progress-bar {
-			width: 80px;
-			height: 4px;
-			background: var(--background-modifier-border);
-			border-radius: 2px;
-			overflow: hidden;
+		.character-counter.warning .count-current {
+			color: var(--text-warning); /* Keep warning color */
 		}
 
-		.progress-fill {
-			height: 100%;
-			transition: all 0.3s ease;
-			border-radius: 2px;
+		.character-counter.error .count-current {
+			color: var(--text-error); /* Keep error color */
 		}
 
 		.progress-fill.safe {
-			background: var(--text-success);
+			background: var(--text-muted); /* Subtle gray instead of bright green */
+			opacity: 0.6; /* Make it even more subtle */
 		}
 
 		.progress-fill.warning {
 			background: var(--text-warning);
+			opacity: 0.8;
 		}
 
 		.progress-fill.error {
 			background: var(--text-error);
 		}
 
-		.field-input {
-			width: 100%;
-			padding: 12px 16px;
-			border: 2px solid var(--background-modifier-border);
-			border-radius: 4px;
-			font-size: 14px;
-			background: var(--background-primary);
-			color: var(--text-normal);
-			transition: all 0.2s ease;
-			font-family: var(--font-interface);
-		}
-
-		.field-input:focus {
-			outline: none;
-			border-color: var(--interactive-accent);
-			box-shadow: 0 0 0 3px var(--interactive-accent-hover);
-		}
-
-		.field-input.input-error {
-			border-color: var(--text-error);
-		}
-
-		.field-input.input-error:focus {
-			border-color: var(--text-error);
-			box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
-		}
-
-		.field-input.input-warning {
-			border-color: var(--text-warning);
-		}
-
-		.field-input.input-warning:focus {
-			border-color: var(--text-warning);
-			box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
-		}
-
 		.field-input.input-valid {
-			border-color: var(--text-success);
+			border-color: var(--background-modifier-border-focus); /* Subtle instead of bright green */
 		}
 
-		.validation-messages {
-			margin-top: 8px;
+		/* Make the character counter less prominent overall */
+		.character-counter {
+			opacity: 0.7; /* Slightly faded */
+			font-size: 0.85rem; /* Smaller text */
 		}
 
-		.validation-message {
-			display: flex;
-			align-items: center;
-			gap: 6px;
-			padding: 6px 8px;
-			border-radius: 4px;
-			margin-bottom: 4px;
-			font-size: 0.9rem;
+		.character-counter:hover {
+			opacity: 1; /* Full opacity on hover */
 		}
 
+		/* More subtle validation messages */
 		.validation-message.error {
-			background: rgba(239, 68, 68, 0.1);
-			color: var(--text-error);
-			border: 1px solid rgba(239, 68, 68, 0.2);
+			background: rgba(239, 68, 68, 0.08); /* Less intense red background */
 		}
 
 		.validation-message.warning {
-			background: rgba(245, 158, 11, 0.1);
-			color: var(--text-warning);
-			border: 1px solid rgba(245, 158, 11, 0.2);
+			background: rgba(245, 158, 11, 0.08); /* Less intense yellow background */
 		}
 
 		.validation-icon {

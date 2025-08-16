@@ -6,6 +6,7 @@ import { parseFrontmatter, updateFrontmatter } from '../utils/frontmatter';
 import { slugify } from '../utils/textUtils';
 import { DateTimeManager, renderDateTimeField } from '../utils/dateUtils';
 import { renderFormFieldWithLimits, getEnhancedFormFieldCSS } from '../utils/enhancedFormField';
+import { FieldLimitsManager } from '../utils/fieldLimits';
 
 export class TabbedUploadModal extends Modal {
 	private plugin: CraftCMSPlugin;
@@ -721,14 +722,14 @@ export class TabbedUploadModal extends Modal {
 				this.dateTimeManager,
 				(value) => {
 					this.formData[field.name] = value;
-					this.updateValidationState(field.name, true); // DateTime fields are always valid
+					this.updateValidationState(field.name, true);
 					console.log(`📅 Updated ${field.name}:`, value);
 				}
 			);
 			return;
 		}
 
-		// Special handling for asset fields (keep your existing asset picker logic)
+		// Special handling for asset fields (keep your existing logic)
 		const isAssetField = ['image', 'featuredImage', 'sidebarAd', 'topAd'].includes(field.name);
 		
 		if (isAssetField && this.dropdownOptions[field.name] && this.dropdownOptions[field.name].length > 0) {
@@ -736,26 +737,15 @@ export class TabbedUploadModal extends Modal {
 			return;
 		}
 
-		// NEW: Create validator function for character limits
-		const validator = (value: string) => {
-			// Use the plugin's schema manager to validate
-			return this.plugin.schemaManager.schemaIntrospector.validateFieldValue(
-				field.name, 
-				value, 
-				{
-					...field,
-					characterLimit: field.maxLength,
-					validationRules: field.validationRules
-				} as any
-			);
-		};
+		// Create field limits manager from plugin settings
+		const fieldLimitsManager = new FieldLimitsManager(this.plugin.settings.fieldLimits || {});
 
 		// Handle dropdown options
 		const hasDropdownOptions = this.dropdownOptions[field.name] && 
 									this.dropdownOptions[field.name].length > 0;
 
 		if (hasDropdownOptions) {
-			// For dropdown fields, use the enhanced renderer but as a select
+			// For dropdown fields
 			const enhancedField = { 
 				...field, 
 				type: 'select' as const, 
@@ -766,6 +756,7 @@ export class TabbedUploadModal extends Modal {
 				container,
 				enhancedField,
 				this.formData[field.name] || '',
+				fieldLimitsManager,
 				(value, isValid) => {
 					this.formData[field.name] = value;
 					this.updateValidationState(field.name, isValid);
@@ -773,17 +764,16 @@ export class TabbedUploadModal extends Modal {
 				}
 			);
 		} else {
-			// NEW: Use the enhanced form field renderer with character limit validation
+			// Regular text/textarea fields with character limits
 			renderFormFieldWithLimits(
 				container,
 				field,
 				this.formData[field.name] || '',
+				fieldLimitsManager,
 				(value, isValid) => {
 					this.formData[field.name] = value;
 					this.updateValidationState(field.name, isValid);
-					console.log(`📝 Updated ${field.name}:`, value, `(valid: ${isValid})`);
-				},
-				validator
+				}
 			);
 		}
 	}

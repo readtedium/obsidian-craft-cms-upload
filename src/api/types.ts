@@ -15,6 +15,7 @@ export interface CraftCMSSettings {
 	webhookUrl?: string;
 	webhookEnabled?: boolean;
 	webhookHeaders?: Record<string, string>;
+	fieldLimits: Record<string, number>;
 }
 
 export interface PostData {

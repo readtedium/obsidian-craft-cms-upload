@@ -15,7 +15,13 @@ export const DEFAULT_SETTINGS: CraftCMSSettings = {
 	// Add webhook defaults
 	webhookUrl: '',
 	webhookEnabled: false,
-	webhookHeaders: {}
+	webhookHeaders: {},
+	fieldLimits: {
+		'metaHeadline': 70,    // SEO title standard
+		'metaDescription': 160, // SEO description standard
+		'deck': 300,
+		'shortDeck': 70,
+	}
 };
 
 export function validateSettings(settings: CraftCMSSettings): string[] {
